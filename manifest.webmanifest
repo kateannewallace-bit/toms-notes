@@ -1,13 +1,13 @@
 {
   "name": "Tom's Note Hunt",
   "short_name": "Note Hunt",
-  "description": "Learn to read music on a chalkboard, from ledger lines to first songs.",
+  "description": "Learn to read music in real notation, from ledger lines to first songs.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#1b2420",
-  "theme_color": "#1b2420",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

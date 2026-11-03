@@ -1,4 +1,4 @@
-"""Draws the app icon (a chalk treble clef and a yellow note on a ledger line, on a slate in a wooden frame) straight to PNG files.
+"""Draws the app icon (a black treble clef and a note on a ledger line, on white) straight to PNG files.
 Usage: run with a Python that has fontTools: python tools/make_icon.py NotoMusic.ttf
 No image library needed: a tiny polygon filler with supersampling."""
 import math, os, struct, sys, zlib
@@ -24,7 +24,7 @@ def contours(name):
                 u = t / 12; cur.append(tuple((1 - u) ** 3 * p0[i] + 3 * u * (1 - u) ** 2 * c1[i] + 3 * u * u * (1 - u) * c2[i] + u ** 3 * e[i] for i in (0, 1)))
         elif op in ('closePath', 'endPath'): out.append(cur)
     return out
-WOOD, SLATE, CHALK, YELLOW = (138, 98, 64), (38, 51, 45), (238, 236, 227), (243, 215, 122)
+WOOD, SLATE, CHALK, YELLOW = (255, 255, 255), (255, 255, 255), (17, 17, 17), (17, 17, 17)
 shapes = [(WOOD, [[(0, 0), (512, 0), (512, 512), (0, 512)]]), (SLATE, [[(34, 34), (478, 34), (478, 478), (34, 478)]])]
 S = 44; bottom = 318
 def rect(x0, y0, x1, y1): return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]

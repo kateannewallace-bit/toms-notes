@@ -19,9 +19,10 @@ const prettyName = p => { const { letter, acc } = parseP(p); return letter + (ac
 const prettySym = p => { const { letter, acc } = parseP(p); return letter + (acc === '#' ? '♯' : acc === 'b' ? '♭' : ''); };
 
 /* ---------- where a note sits ---------- */
+// Every walk counts out from a C: Middle C first, then the next C out on that staff once the note is past it.
 const CLEF = {
-  t: { name: 'treble', bottom: stepOf('E4'), marks: [['E4', 'the bottom line, E'], ['G4', 'the G line, where the clef curls'], ['F5', 'the top line, F']] },
-  b: { name: 'bass', bottom: stepOf('G2'), marks: [['G2', 'the bottom line, G'], ['F3', 'the F line, between the clef’s two dots'], ['A3', 'the top line, A']] },
+  t: { name: 'treble', bottom: stepOf('E4'), cs: [['C6', 'the C on the second ledger line above the staff'], ['C5', 'the C in the third space'], ['C4', 'Middle C']] },
+  b: { name: 'bass', bottom: stepOf('G2'), cs: [['C2', 'the C on the second ledger line below the staff'], ['C3', 'the C in the second space'], ['C4', 'Middle C']] },
 };
 const topOf = c => CLEF[c].bottom + 8;
 const regionOf = (c, s) => s > topOf(c) ? 'above' : s < CLEF[c].bottom ? 'below' : 'on';
@@ -41,17 +42,17 @@ function describe(c, s) {
   if (d === 1) return reg === 'above' ? 'just above the top line, no ledger line needed' : 'just below the bottom line, no ledger line needed';
   return `${reg === 'above' ? 'just above' : 'just under'} the ${ORD[(d - 1) / 2]} ledger line ${word} the staff`;
 }
-// The nearest landmark, and the walk of letters from it to this note.
+// The C to start from, and the walk of letters from it to this note.
 function walkTo(c, s) {
-  const marks = CLEF[c].marks.map(([p, words]) => ({ s: stepOf(p), words }));
-  const mark = marks.reduce((a, b) => Math.abs(b.s - s) < Math.abs(a.s - s) ? b : a);
-  const dir = s >= mark.s ? 1 : -1, steps = [];
+  const outward = ([p]) => c === 't' ? s >= stepOf(p) : s <= stepOf(p);
+  const [p, words] = CLEF[c].cs.find(outward) || CLEF[c].cs[2];
+  const mark = { s: stepOf(p), words }, dir = s >= mark.s ? 1 : -1, steps = [];
   for (let x = mark.s; ; x += dir) { steps.push(x); if (x === s) break; }
   return { mark, steps, dir };
 }
 function walkWords(c, s) {
   const { mark, steps, dir } = walkTo(c, s);
-  if (steps.length === 1) return `This is ${mark.words}.`;
+  if (steps.length === 1) return mark.words === 'Middle C' ? 'This is Middle C.' : `This is ${mark.words}.`;
   return `Start on ${mark.words}. Go ${dir > 0 ? 'up' : 'down'}: ${steps.slice(1).map(letterOf).join(', ')}.`;
 }
 
@@ -69,6 +70,11 @@ const glyph = (name, x, yBase, S, cls = '', flip = false) => {
   const k = S / 250;
   return `<path class="gl ${cls}" transform="translate(${x.toFixed(1)} ${yBase.toFixed(1)}) scale(${k.toFixed(4)} ${(flip ? k : -k).toFixed(4)})" d="${GLYPHS[name].d}"/>`;
 };
+// A note head from the font, centered on this line or space.
+const headGlyph = (name, x, y, S, cls) => {
+  const [x0, y0, x1, y1] = GLYPHS[name].b, k = S / 250;
+  return glyph(name, x - (x0 + x1) / 2 * k, y + (y0 + y1) / 2 * k, S, cls);
+};
 // Draws one note: head, ledger lines, stem, flag, dot, and an accidental in front. Returns the svg and where the stem ends, for beaming.
 function drawNote(c, x, s, d, S, Y, o = {}) {
   const y = Y(s), cls = o.cls || '', top = topOf(c), bottom = CLEF[c].bottom, mid = bottom + 4;
@@ -77,18 +83,16 @@ function drawNote(c, x, s, d, S, Y, o = {}) {
   for (let a = top + 2; a <= s; a += 2) out += `<line class="st-ledger" x1="${x - lw}" x2="${x + lw}" y1="${Y(a)}" y2="${Y(a)}"/>`;
   for (let a = bottom - 2; a >= s; a -= 2) out += `<line class="st-ledger" x1="${x - lw}" x2="${x + lw}" y1="${Y(a)}" y2="${Y(a)}"/>`;
   const base = (d || 'q').replace('.', '');
-  if (base === 'w') out += `<ellipse class="n-open ${cls}" cx="${x}" cy="${y}" rx="${S * .68}" ry="${S * .4}" stroke-width="${S * .2}"/>`;
-  else if (base === 'h') out += `<ellipse class="n-open ${cls}" cx="${x}" cy="${y}" rx="${S * .58}" ry="${S * .38}" stroke-width="${S * .16}" transform="rotate(-20 ${x} ${y})"/>`;
-  else out += `<ellipse class="n-head ${cls}" cx="${x}" cy="${y}" rx="${S * .66}" ry="${S * .46}" transform="rotate(-20 ${x} ${y})"/>`;
+  out += headGlyph(base === 'w' ? 'hwhole' : base === 'h' ? 'hvoid' : 'hblack', x, y, S, `n-head ${cls}`);
   if (o.acc) out += glyph(o.acc === '#' ? 'sharp' : o.acc === 'b' ? 'flat' : 'natural', x - S * 2, y + S * .53, S, cls);  // the font centers these half a space above its baseline
   let stem = null;
   if (base !== 'w' && !o.noStem) {
     const up = o.up ?? s < mid;
-    const sx = up ? x + S * .6 : x - S * .6;
+    const sx = up ? x + S * .55 : x - S * .55;
     let end = up ? y - S * 3.4 : y + S * 3.4;
     if (up ? end > Y(mid) : end < Y(mid)) end = Y(mid);  // notes far from the staff keep their stems reaching its middle line
     if (o.stemTo != null) end = o.stemTo;
-    out += `<line class="n-stem ${cls}" x1="${sx}" x2="${sx}" y1="${y}" y2="${end}" stroke-width="${S * .13}"/>`;
+    out += `<line class="n-stem ${cls}" x1="${sx}" x2="${sx}" y1="${y}" y2="${end}" stroke-width="${S * .1}"/>`;
     stem = { x: sx, end, up };
     if (base === 'e' && !o.beamed) out += glyph('flag', sx - S * .06, up ? end + (1009 / 250) * S : end - (1009 / 250) * S, S, cls, !up);
   }
@@ -123,7 +127,7 @@ function staffSvg(o) {
   const weight = i => i.bar ? .35 : Math.max(.85, Math.sqrt(BEATS[i.d || i.r || i.gap || 'q'] || 1));
   const total = items.reduce((t, i) => t + weight(i), 0) || 1;
   let x = x0;
-  const placed = items.map(i => { const a = weight(i) / total * room, at = o.noteX && items.length === 1 ? o.noteX : x + (i.bar ? a : Math.min(a / 2, S * 1.6)); x += a; return at; });
+  const placed = items.map(i => { const a = weight(i) / total * room, at = o.noteX && items.length === 1 ? o.noteX : x + (i.bar ? a : o.even ? a / 2 : Math.min(a / 2, S * 1.6)); x += a; return at; });
   // eighth notes beam in pairs
   const pairs = new Map();
   for (let i = 0; i < items.length - 1; i++) {

@@ -8,8 +8,6 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const childName = () => (state.childName || '').trim();
 const N = () => childName() || 'your child';
 const greet = s => childName() ? `${s}, ${childName()}!` : `${s}!`;
-const heroName = () => childName() ? `${childName()} the Hunter` : 'The Hunter';
-const fillHero = s => s.replaceAll('{hero}', heroName());
 
 /* ---------- topics and items ---------- */
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t]));
@@ -34,15 +32,26 @@ const startOfDay = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return 
 function defaultState() {
   return {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
-    on: { ledger: true, treble: true, bass: true },
+    on: { path: true, reading: true },
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, speed: 'normal', updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters', speed: 'normal', updatedAt: 0,
   };
 }
 function normalize(s) {
   s = Object.assign(defaultState(), s || {});
   s.levels = Object.assign(defaultState().levels, s.levels);
   s.on = Object.assign({}, s.on);
+  // The note topics were once ledger, treble and bass. They are one path now: known notes keep counting, and review cards carry over.
+  if (s.on.ledger || s.on.treble || s.on.bass || s.levels.ledger) {
+    delete s.on.ledger; delete s.on.treble; delete s.on.bass;
+    s.on.path = true;
+    for (const k of ['ledger', 'treble', 'bass']) delete s.levels[k];
+    const levelOf = wid => LEVELS.path.findIndex(l => l.items.some(i => i.wid === wid)) + 1;
+    const oldTopic = c => ['ledger', 'treble', 'bass'].includes(c.topic);
+    s.cards = s.cards.filter(c => !oldTopic(c) || levelOf(c.wid) > 0).map(c => oldTopic(c) ? { ...c, topic: 'path', level: levelOf(c.wid) } : c);
+    const open = LEVELS.path.findIndex(l => !l.items.every(i => { const w = s.words[i.wid]; return w && (w.k || (w.r || 0) - (w.m || 0) >= 2); }));
+    s.levels.path = open < 0 ? LEVELS.path.length : open + 1;
+  }
   return s;
 }
 
@@ -158,6 +167,8 @@ const RHYTHM_AT = lv => lv >= 4 ? ['q', 'h', 'w', 'e', 'h.', 'q.'] : lv >= 2 ? [
 const barBeats = bar => bar.reduce((t, d) => t + BEATS[d], 0);
 const seqOf = (list, midi = 67, bpm) => list.map(d => ({ midi, beats: BEATS[d] }));
 
+// Notes already asked this round, so a new note's second question can be a different kind.
+const roundSeen = new Set();
 function makeProblem(k, level, seed, kind = 'current', wid) {
   rng = seeded(seed);
   const pool = LEVELS[k][Math.min(level, maxLevel(k)) - 1].items;
@@ -179,19 +190,27 @@ function noteProblem(p, it, k) {
   const c = it.clef, s = stepOf(it.p);
   p.clef = c; p.p = it.p; p.step = s; p.letter = letterOf(s);
   p.acc = parseP(it.p).acc;
-  const wide = k === 'ledger';
-  p.lo = wide ? CLEF[c].bottom - 7 : CLEF[c].bottom - 2;
-  p.hi = wide ? topOf(c) + 7 : topOf(c) + 2;
+  // only the place-the-note question needs room held for notes that aren't there yet
+  p.lo = CLEF[c].bottom - 7;
+  p.hi = topOf(c) + 7;
   p.hearP = it.p;
   p.answerText = () => `${midCName(it.p)}, ${describe(c, s)}.`;
   const roll = rng();
   let mode = 'letters';
   if (it.keyOnly) mode = 'key';
-  else if (p.kind === 'check' || !isSeen(it.wid)) mode = 'letters';
-  else if (k === 'ledger') mode = roll < .45 ? 'letters' : roll < .65 ? 'place' : roll < .8 ? 'key' : regionOf(c, s) === 'on' ? 'letters' : roll < .9 ? 'where' : 'count';
-  else mode = roll < .65 ? 'letters' : 'place';
+  else if (p.kind === 'check' || (!isSeen(it.wid) && !roundSeen.has(it.wid))) mode = 'letters';
+  else if (roll < .6) mode = 'row';
+  else if (roll < .75) mode = 'place';
+  else if (roll < .9) mode = 'key';
+  else if (regionOf(c, s) === 'on') mode = 'row';
+  else mode = roll < .95 ? 'where' : 'count';
+  if (mode === 'row' && buildRow(p, it, k)) return;
+  if (mode === 'row') mode = 'letters';
+  // the grown-ups' setting: answer with piano keys instead of letter buttons
+  if (mode === 'letters' && state.answerWith === 'piano' && p.kind !== 'check') mode = 'key';
   if (mode === 'key') {
     p.mode = state.realPiano ? 'real' : 'key';
+    delete p.lo; delete p.hi;
     p.prompt = p.mode === 'real' ? 'Find this note on your piano and play it.' : 'Find this note on the piano.';
     p.targetMidi = midiOf(it.p);
     p.whites = 11;
@@ -207,6 +226,7 @@ function noteProblem(p, it, k) {
     return;
   }
   p.mode = 'choice';
+  delete p.lo; delete p.hi;
   if (mode === 'where') {
     p.prompt = 'Where is this note head?';
     const led = ledgersFor(c, s), on = onLine(c, s);
@@ -224,6 +244,28 @@ function noteProblem(p, it, k) {
     p.layout = 'letters';
     p.choices = LETTER_CHOICES().map(l => ({ t: l, ok: l === p.letter }));
   }
+}
+// A row of notes on one staff, read left to right, one button press per note. The row is a short pattern that repeats: C D C D C D.
+// The pattern holds this note plus others already met on the same clef, close enough to fit one stretch of keys.
+function buildRow(p, it, k) {
+  const c = it.clef, s = stepOf(it.p);
+  const met = LEVELS[k].slice(0, p.level).flatMap(l => l.items).filter(i => i.note && i.clef === c && Math.abs(stepOf(i.p) - s) <= 9 && (i === it || isSeen(i.wid) || roundSeen.has(i.wid)));
+  const others = shuffle(met.filter(i => i.p !== it.p));
+  if (!others.length) return false;
+  // longer patterns come once there are more notes to choose from
+  const longest = others.length >= 5 ? 4 : others.length >= 2 ? 3 : 2;
+  const size = 2 + Math.floor(rng() * (longest - 1));
+  const pattern = shuffle([it, ...others.slice(0, size - 1)]);
+  const row = Array.from({ length: size === 4 ? 8 : 6 }, (_, i) => pattern[i % size]);
+  p.mode = 'row';
+  p.prompt = 'Read the notes from left to right.';
+  p.notes = row.map(i => ({ wid: i.wid, p: i.p, step: stepOf(i.p), tries: 0, state: '' }));
+  p.at = 0; p.misses = 0;
+  if (state.answerWith === 'piano' && !state.realPiano) {
+    const steps = p.notes.map(x => x.step), lo = Math.min(...steps), hi = Math.max(...steps);
+    p.from = lo - 1; p.whites = Math.max(8, hi - lo + 3); p.rowKeys = true;
+  }
+  return true;
 }
 function twinProblem(p, it) {
   const from = pick(['t', 'b']), to = from === 't' ? 'b' : 't', s = stepOf(it.p);
@@ -265,7 +307,7 @@ function keyProblem(p, it) {
     p.whites = 15; p.from = stepOf('C3');
     p.prompt = 'Tap Middle C.';
     p.targetMidi = MIDDLE_C;
-    p.answerText = () => 'Middle C is the C in the middle. It’s the trapdoor.';
+    p.answerText = () => 'Middle C is the C in the middle.';
   } else if (it.findKey) {
     const pc = midiOf(it.findKey + '4') % 12;
     p.prompt = `Tap any ${prettyName(it.findKey + '4')}.`;
@@ -331,7 +373,7 @@ function measureProblem(p, it) {
     const list = [];
     for (let i = 0; i < bars; i++) { list.push(...pick(bank)); list.push('|'); }
     p.vis = smallRhythm(list, { width: 340, S: 10, time: [4, 4] });
-    p.prompt = 'How many bars are here? Count the rooms between the walls.';
+    p.prompt = 'How many bars are here? Bar lines separate them.';
     p.layout = 'nums';
     p.choices = [2, 3, 4, 5].map(x => ({ t: String(x), ok: x === bars }));
     p.answerText = () => `${bars} bars.`;
@@ -484,12 +526,13 @@ function introFor(it) {
 }
 function buildSession() {
   let on = ORDER.filter(k => state.on[k]);
-  if (!on.length) on = ['ledger'];
+  if (!on.length) on = ['path'];
   // At most two new chapters a round; a topic with a third waits for the next round.
   const unread = on.filter(k => !state.chapters[chapterKey(k, levelNow(k))]);
   const held = new Set(unread.slice(MAX_CHAPTERS));
   on = on.filter(k => !held.has(k));
   const n = state.perSession, used = new Map();
+  roundSeen.clear();
   const slides = [];
   for (const k of unread.slice(0, MAX_CHAPTERS)) slides.push({ mode: 'chapter', topic: k, level: levelNow(k), done: true, chapter: LEVELS[k][levelNow(k) - 1] });
   let newCount = 0;
@@ -500,18 +543,21 @@ function buildSession() {
     if (wasNew) newCount++;
     used.set(it.wid, (used.get(it.wid) || 0) + 1);
     const q = makeProblem(k, L, seed ?? newSeed(), kind, it.wid);
+    roundSeen.add(it.wid);
     if (card) q.card = card;
     qs.push(q);
   };
   for (const c of dueCards().filter(c => !held.has(c.topic)).slice(0, Math.ceil(n * .3))) take(c.topic, c.level, 'again', findItem(c.topic, c.wid), c.box === 0 ? c.seed : newSeed(), c.id);
-  // The ledger lines are the point right now, so they get a double turn in the rotation when on.
-  const rotation = shuffle(on.flatMap(k => k === 'ledger' && on.length > 1 ? [k, k] : [k]));
+  // The path from Middle C is the point right now, so it gets a double turn in the rotation when on.
+  const rotation = shuffle(on.flatMap(k => k === 'path' && on.length > 1 ? [k, k] : [k]));
   for (let i = 0; qs.length < n && i < n * 8; i++) {
     const k = rotation[i % rotation.length], L = levelNow(k);
     const cur = LEVELS[k][L - 1].items, earlier = LEVELS[k].slice(0, L - 1).flatMap(l => l.items);
     const review = earlier.length && Math.random() < .3;
     let pool = review ? earlier : cur;
-    pool = pool.filter(it => (used.get(it.wid) || 0) < 2 && (seenThisRound(it) || newCount < MAX_NEW));
+    // a level with few notes, like Middle C alone, can ask each one more often
+    const limit = Math.max(2, Math.ceil(n / (cur.length + earlier.length)));
+    pool = pool.filter(it => (used.get(it.wid) || 0) < limit && (seenThisRound(it) || newCount < MAX_NEW));
     if (!pool.length) continue;
     // new things first, then the shakiest
     const weigh = it => (!isSeen(it.wid) ? 6 : isKnown(it.wid) ? 1 : 4) / (1 + (used.get(it.wid) || 0));
@@ -541,7 +587,7 @@ function buildSession() {
 function startSession() { audioReady(); sess = buildSession(); screen = 'play'; render(); enterSlide(); }
 
 /* Quick check: placement. Two notes from each early level, one try each. A level with no misses is marked known, up to the first miss. */
-const CHECK_LEVELS = { ledger: [0, 1, 2, 3, 4], treble: [0, 1], bass: [0, 1] };
+const CHECK_LEVELS = { path: [0, 1, 2, 3, 4, 5, 6, 7, 8] };
 function buildCheck() {
   const probs = [];
   for (const [k, lvs] of Object.entries(CHECK_LEVELS)) for (const li of lvs) {
@@ -573,7 +619,7 @@ function enterSlide() {
   if (state.autoSpeak) say(slideWords(p));
 }
 function slideWords(p) {
-  if (p.mode === 'chapter') return `${p.chapter.title}. ${fillHero(p.chapter.story)} ${p.chapter.lesson}`;
+  if (p.mode === 'chapter') return `${p.chapter.name}. ${p.chapter.lesson}`;
   if (p.mode === 'intro') return `${p.intro.title}. ${p.intro.words}`;
   return p.line || p.prompt;
 }
@@ -607,6 +653,7 @@ function answer(idx) {
 }
 function tapKey(midi) {
   const p = sess?.probs[sess.i];
+  if (p?.mode === 'row') return rowPress(midi);
   tone(midi);
   if (!p || p.done || p.mode !== 'key') return;
   const ok = p.okMidi ? p.okMidi(midi) : midi === p.targetMidi;
@@ -631,6 +678,60 @@ function selfCheck(ok) {
   if (ok) { gotIt(p); } else { p.tries = 1; p.done = true; p.revealed = true; tell(p, p.answerText()); record(p, false); }
   render();
 }
+// One press in a row of notes: a letter, or a piano key's number.
+function rowPress(v) {
+  const p = sess.probs[sess.i];
+  if (p.done || p.mode !== 'row') return;
+  const n = p.notes[p.at], ok = p.rowKeys ? v === whiteMidi(n.step) : v === letterOf(n.step);
+  if (p.rowKeys) tone(v);
+  if (ok) {
+    if (!p.rowKeys) tone(whiteMidi(n.step));
+    n.state = n.tries ? 'late' : 'ok';
+    p.lastWrong = null;
+    noteDone(p, n, n.tries === 0);
+    return render();
+  }
+  n.tries++;
+  p.misses++;
+  const named = p.rowKeys ? keyName(v) : v;
+  if (n.tries >= 2) {
+    tone(whiteMidi(n.step));
+    n.state = 'shown';
+    p.lastWrong = `Not ${named}. That one is ${letterOf(n.step)}. ${walkWords(p.clef, n.step)}`;
+    noteDone(p, n, false);
+  } else p.lastWrong = `Not ${named}. ${hintWords(p.clef, n.step)}`;
+  if (state.autoSpeak) say(p.lastWrong);
+  render(n.tries < 2);
+}
+function noteDone(p, n, first) {
+  const w = state.words[n.wid] = state.words[n.wid] || { r: 0, m: 0 };
+  const before = isKnown(n.wid);
+  // A note repeats in a pattern, but one row is only one piece of evidence: count a right answer once per row, and a miss once.
+  p.counted = p.counted || {};
+  const was = p.counted[n.wid];
+  if (first && !was) w.r = Math.min(20, (w.r || 0) + 1);
+  if (!first && was !== 'miss') { w.m = Math.min(20, (w.m || 0) + 1); w.k = 0; }
+  p.counted[n.wid] = first && was !== 'miss' ? 'right' : 'miss';
+  w.t = Date.now();
+  if (!before && isKnown(n.wid) && !sess.learned.includes(n.wid)) sess.learned.push(n.wid);
+  if (!first && was !== 'miss' && !(p.kind === 'again' && n.wid === p.wid)) addCard({ topic: p.topic, level: LEVELS[p.topic].findIndex(l => l.items.some(i => i.wid === n.wid)) + 1, wid: n.wid, seed: newSeed() });
+  p.at++;
+  if (p.at >= p.notes.length) {
+    p.done = true;
+    const clean = p.misses === 0;
+    p.praise = clean ? pick(PRAISE) : `${p.notes.filter(x => x.state === 'ok').length} of ${p.notes.length} right the first time.`;
+    p.result = clean;
+    sess.results.push(clean);
+    state.total++;
+    state.done[p.topic] = (state.done[p.topic] || 0) + 1;
+    // a row with one slip still counts toward moving up
+    if (p.kind === 'current') state.rec[p.topic] = [...(state.rec[p.topic] || []), p.misses <= 1].slice(-10);
+    if (p.kind === 'again') reviewCard(p.card, clean);
+    if (state.autoSpeak) say(p.praise);
+  }
+  save();
+}
+const playRow = p => playSeq(p.notes.map(n => ({ midi: whiteMidi(n.step), beats: 1 })), 100);
 function record(p, first) {
   sess.results.push(first);
   p.result = first;
@@ -647,7 +748,7 @@ function record(p, first) {
   else if (!first) addCard(p);
   save();
 }
-// A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being caught.
+// A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being right.
 function addCard(p) {
   const due = startOfDay() + DAY * REVIEW_DAYS[0];
   const same = state.cards.find(c => c.topic === p.topic && c.wid === p.wid);
@@ -745,10 +846,10 @@ function levelBar(k) {
   const segs = Array.from({ length: max }, (_, i) => `<span class="seg-bar"><i style="width:${Math.round((state.mastered[k] || i < L - 1 ? 1 : i === L - 1 ? pct : 0) * 100)}%"></i></span>`).join('');
   return `<span class="lvlbar ${state.mastered[k] ? 'done' : ''}" role="img" aria-label="Level ${L} of ${max}">${segs}</span>`;
 }
-// The Hunter's map: every note from the bottom of the Cellar to the top of the sky. Caught ones glow.
+// Every note the app teaches, low to high on each staff. Learned ones glow.
 function hunterMap() {
   const known = knownNotes();
-  const row = (c, lo, hi) => {
+  const row = (c, lo, hi) => {  // always written low to high
     const items = [];
     for (let s = stepOf(lo); s <= stepOf(hi); s++) items.push({ p: pitchOf(s), noStem: true, cls: known.has(`${c}:${pitchOf(s)}`) ? 'caught' : 'wild' });
     return staffSvg({ clef: c, S: 9, width: 520, items, cl: 'map' });
@@ -763,15 +864,14 @@ function renderHome() {
   return `
   <header class="top"><h1>${esc(greet('Hello'))}</h1><button class="link" data-act="parent">For grown-ups</button></header>
   <section>
-    <div class="goal-head"><h2>Notes caught</h2><span class="count">${caught} of ${total}</span></div>
+    <div class="goal-head"><h2>Notes learned</h2><span class="count">${caught} of ${total}</span></div>
     ${hunterMap()}
-    <p class="note">The Death Raccoon has scattered the notes past the castle walls. Each one you catch lights up here.</p>
   </section>
   <section>
-    <h2>What are we hunting?</h2>
+    <h2>What are we practicing?</h2>
     <div class="chips">${ORDER.map(chip).join('')}</div>
   </section>
-  <button class="start" data-act="start">Start the hunt <small>${state.perSession} questions</small></button>
+  <button class="start" data-act="start">Start <small>${state.perSession} questions</small></button>
   <section>
     <h2>Songs to play</h2>
     <div class="songs">${SONGS.map(s => { const r = state.songs[s.id]; return `<button class="song-btn" data-act="song" data-id="${s.id}">${r ? starSvg(r.best === 0) : starSvg(false)}<span><strong>${esc(s.name)}</strong><small>${esc(s.tag)}</small></span></button>`; }).join('')}</div>
@@ -785,7 +885,7 @@ function promptRow(text) {
 function noteStaff(p, S = 16) {
   const walk = (p.tries > 0 || p.revealed) && !(p.done && !p.revealed) ? walkTo(p.clef, stepOf(p.p)) : null;
   const items = [{ p: p.p, d: 'q', acc: p.acc || undefined, cls: p.done ? (p.revealed ? 'try' : 'ok') : '' }];
-  return staffSvg({ clef: p.clef, S, width: 340, lo: p.lo, hi: p.hi, items, noteX: 270, walk: walk && walk.steps.length > 1 ? { steps: walk.steps, hide: !p.done } : null });
+  return staffSvg({ clef: p.clef, S, width: S * 17, lo: p.lo, hi: p.hi, items, noteX: S * 13.5, walk: walk && walk.steps.length > 1 ? { steps: walk.steps, hide: !p.done } : null });
 }
 function placeStaff(p) {
   const S = 20, width = 340, x = 240;
@@ -794,6 +894,24 @@ function placeStaff(p) {
   const placed = !p.done && p.sel != null ? placedNote(p.clef, p.sel, x, S, yT) : '';
   const walk = p.revealed ? walkTo(p.clef, p.step) : null;
   return staffSvg({ clef: p.clef, S, width, lo: p.lo, hi: p.hi, items, noteX: x, live: !p.done, placed, walk: walk && walk.steps.length > 1 ? { steps: walk.steps, hide: false } : null, cl: 'tall' });
+}
+function rowStaff(p) {
+  const size = p.notes.length, S = 24, width = size === 8 ? 620 : 520;
+  const cls = (n, i) => n.state === 'ok' ? 'ok' : n.state === 'late' ? 'late' : n.state === 'shown' ? 'try' : i === p.at && !p.done ? 'now' : '';
+  const low = Math.min(CLEF[p.clef].bottom, ...p.notes.map(n => n.step));
+  const extra = ({ x, Y }) => {
+    const labels = p.notes.map((n, i) => n.state ? `<text class="row-l ${cls(n, i)}" x="${x[i]}" y="${Y(low) + S * 2}" font-size="${S * .95}">${letterOf(n.step)}</text>` : '');
+    const arrow = p.done ? '' : `<path class="row-arrow" d="M${x[p.at]} ${Y(low) + S * .95}l${-S * .4} ${S * .6}h${S * .8}z"/>`;
+    return labels.join('') + arrow;
+  };
+  return staffSvg({ clef: p.clef, S, width, even: true, items: [...p.notes.map((n, i) => ({ p: n.p, d: 'q', cls: cls(n, i) })), { bar: 1 }], extra, cl: 'row', label: `${size} notes on the ${CLEF[p.clef].name} staff` });
+}
+function rowButtons(p) {
+  if (p.done) return '';
+  if (p.rowKeys) {
+    return `<div class="key-wrap live">${pianoSvg({ from: p.from, whites: p.whites, letters: 'c' })}${pianoHint(p)}</div>`;
+  }
+  return `<div class="choices letters">${'ABCDEFG'.split('').map(l => `<button class="choice" data-act="row-letter" data-l="${l}">${l}</button>`).join('')}</div>`;
 }
 function pianoFor(p) {
   const marks = {};
@@ -830,7 +948,10 @@ function feedbackHtml(p) {
 function chapterShow(c) {
   const s = c.show || {};
   const labelled = (clef, ps) => staffSvg({ clef, S: 13, width: 340, items: ps.map(x => ({ p: x, d: 'w', acc: parseP(x).acc || undefined })), extra: ({ x, Y, S }) => ps.map((pp, i) => `<text class="walk final" x="${x[i]}" y="${stepOf(pp) >= CLEF[clef].bottom + 4 ? Y(stepOf(pp)) - S * 1.1 - (ledgersFor(clef, stepOf(pp)) ? 0 : 0) : Y(stepOf(pp)) + S * 1.9}" text-anchor="middle" font-size="${S * 1.15}">${prettySym(pp)}</text>`).join('') });
-  if (s.pair) return `<div class="pair">${staffSvg({ clef: 't', S: 12, width: 170, lo: stepOf(s.pair[0]) - 1, items: [{ p: s.pair[0], d: 'w' }] })}${staffSvg({ clef: 'b', S: 12, width: 170, hi: stepOf(s.pair[1]) + 1, items: [{ p: s.pair[1], d: 'w' }] })}</div>`;
+  if (s.pair) {
+    const pairLo = Math.min(stepOf(s.pair[0]), CLEF.t.bottom) - 1, pairHi = Math.max(stepOf(s.pair[1]), topOf('b')) + 1;
+    return `<div class="pair">${staffSvg({ clef: 't', S: 12, width: 170, lo: pairLo, items: [{ p: s.pair[0], d: 'w' }] })}${staffSvg({ clef: 'b', S: 12, width: 170, hi: pairHi, items: [{ p: s.pair[1], d: 'w' }] })}</div>`;
+  }
   if (s.clef) return labelled(s.clef, s.p);
   if (s.rhythm) return smallRhythm(s.rhythm, { width: 320, S: 14 });
   if (s.bar) return smallRhythm([...s.bar, '|'], { width: 340, S: 13, time: s.time });
@@ -856,22 +977,27 @@ function renderPlay() {
   const foot = `<button class="link" data-act="home" style="align-self:flex-start">Stop and go home</button>`;
   if (p.mode === 'chapter') {
     const c = p.chapter;
-    return `${head}<div class="chapter"><span class="tag">New chapter</span><h1>${esc(c.title)}</h1><p class="story">${esc(fillHero(c.story))}</p><div class="chapter-vis">${chapterShow(c)}</div><p class="lesson">${esc(c.lesson)}</p></div>
-    <div class="next-row"><button class="ghost" data-act="say">${speakerIcon.replace('<svg', '<svg class="ic"')} Read it</button><button class="start" data-act="next" id="next">On the hunt</button></div>${foot}`;
+    return `${head}<div class="chapter"><span class="tag">New</span><h1>${esc(c.name)}</h1><div class="chapter-vis">${chapterShow(c)}</div><p class="lesson">${esc(c.lesson)}</p></div>
+    <div class="next-row"><button class="ghost" data-act="say">${speakerIcon.replace('<svg', '<svg class="ic"')} Read it</button><button class="start" data-act="next" id="next">Start</button></div>${foot}`;
   }
   if (p.mode === 'intro') {
     const c = p.intro, it = p.item;
-    const vis = c.kind === 'note' ? staffSvg({ clef: it.clef, S: 16, width: 340, items: [{ p: it.p, d: 'q', cls: 'ok' }], noteX: 270, walk: walkTo(it.clef, stepOf(it.p)).steps.length > 1 ? { steps: walkTo(it.clef, stepOf(it.p)).steps, hide: false } : null }) : c.vis;
+    const vis = c.kind === 'note' ? staffSvg({ clef: it.clef, S: 24, width: 408, items: [{ p: it.p, d: 'q' }], noteX: 324, walk: walkTo(it.clef, stepOf(it.p)).steps.length > 1 ? { steps: walkTo(it.clef, stepOf(it.p)).steps, hide: false } : null }) : c.vis;
     return `${head}<div class="problem"><span class="tag">New</span><button class="vis-btn" data-act="hear-intro" aria-label="Hear it">${vis}</button><div class="word">${esc(c.title)}</div><p class="how center">${esc(c.words)}</p></div>
     <div class="next-row"><button class="ghost" data-act="hear-intro">♪ Hear it</button><button class="ghost" data-act="say">${speakerIcon.replace('<svg', '<svg class="ic"')} Read it</button><button class="start" data-act="next" id="next">Got it</button></div>${foot}`;
   }
   let body = '', controls = '';
   const isNoteStaff = p.item.note && (p.mode === 'choice' || p.mode === 'key' || p.mode === 'real');
+  if (p.mode === 'row') {
+    return `${head}<div class="problem" id="problem">${promptRow(p.prompt)}<div class="staff-wrap row-wrap">${rowStaff(p)}</div></div>${rowButtons(p)}
+    <div class="feedback">${p.done ? `<span class="big ${p.misses ? 'try' : 'good'}">${esc(p.praise)}</span>${p.lastWrong ? `<span class="how">${esc(p.lastWrong)}</span>` : ''}` : p.lastWrong ? `<span class="how try-line">${esc(p.lastWrong)}</span>` : ''}</div>
+    ${p.done ? `<div class="next-row"><button class="ghost" data-act="row-hear">♪ Hear the row</button><button class="start" data-act="next" id="next">${last ? 'My stars' : 'Next'}</button></div>` : ''}${foot}`;
+  }
   if (p.mode === 'place') {
     body = promptRow(p.prompt) + `<div class="staff-wrap">${placeStaff(p)}</div>`;
     controls = p.done ? '' : `<div class="next-row"><button class="start" data-act="check-place" ${p.sel == null ? 'disabled' : ''}>That’s it</button></div><p class="note center">Tap or drag on the staff to move the note.</p>`;
   } else if (p.mode === 'key') {
-    const staff = p.item.note ? `<div class="staff-wrap small">${noteStaff(p, 14)}</div>` : '';
+    const staff = p.item.note ? `<div class="staff-wrap small">${noteStaff(p, 20)}</div>` : '';
     body = promptRow(p.prompt) + staff + pianoFor(p);
   } else if (p.mode === 'real') {
     body = promptRow(p.prompt) + `<div class="staff-wrap">${noteStaff(p)}</div>`;
@@ -880,7 +1006,7 @@ function renderPlay() {
       : `<div class="next-row"><button class="start" data-act="said-yes">✓ It matched</button><button class="ghost" data-act="said-no">It didn’t</button></div><div class="feedback"><span class="how">${esc(p.answerText())}</span></div>`;
   } else {
     let vis = '';
-    if (isNoteStaff || p.item.twin) vis = `<div class="staff-wrap">${noteStaff(p, p.item.twin ? 13 : 16)}</div>`;
+    if (isNoteStaff || p.item.twin) vis = `<div class="staff-wrap">${noteStaff(p, p.item.twin ? 18 : 24)}</div>`;
     else if (p.vis) vis = `<div class="staff-wrap">${p.vis}</div>`;
     else if (p.hl != null) vis = pianoSvg({ from: p.from, whites: p.whites, marks: { [p.hl]: 'hl' }, letters: false, star: false });
     else if (p.keyStrip) vis = pianoSvg(p.keyStrip);
@@ -904,7 +1030,7 @@ function renderDone() {
   const ups = lastChanges.filter(c => c[1] === 'up');
   return `<h1>${esc(greet(sess.cheer.head))}</h1>
   <p class="story left">${esc(sess.cheer.line)}</p>
-  <p class="meta">${score} of ${n} right on the first try.${sess.learned.length ? ` ${sess.learned.length} new caught for good.` : ''}</p>
+  <p class="meta">${score} of ${n} all right on the first try.${sess.learned.length ? ` ${sess.learned.length} newly learned.` : ''}</p>
   <div class="stars">${sess.results.map(starSvg).join('')}</div>
   ${ups.length ? `<section><h2>Next level</h2><ul class="ups">${ups.map(([k]) => `<li>${esc(TOPIC[k].name)}: ${esc(LEVELS[k][state.levels[k] - 1].name)}</li>`).join('')}</ul></section>` : ''}
   <section><h2>Away from the screen</h2><p class="off">${esc(sess.hands)}</p></section>
@@ -967,13 +1093,15 @@ function renderParent() {
     <div class="row-btns"><span>Questions per round</span><div class="seg">${[5, 10, 15, 20].map(x => `<button data-act="per" data-n="${x}" aria-pressed="${state.perSession === x}">${x}</button>`).join('')}</div></div>
     <div class="row-btns"><span>Read aloud automatically</span>${seg('autospeak', state.autoSpeak ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">Off: nothing is spoken until you tap the speaker button. Music sounds always play.</p>
+    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['piano', 'Piano keys']])}</div>
+    <p class="note">Letter buttons: any C is answered with the C button. Piano keys: each note must be played on its exact key.</p>
     <div class="row-btns"><span>Real piano nearby</span>${seg('realpiano', state.realPiano ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">On: "find this key" questions and songs are played on your own piano. The app plays the right note so ${esc(N())} can check by ear. Off: tap the keys on screen.</p>
     <div class="row-btns"><span>Speaking speed</span>${seg('speed', state.speed, [['normal', 'Normal'], ['slow', 'Slower']])}</div>
   </section>
   <section>
     <h2>Coming back for review</h2>
-    <p class="note">A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being caught. ${state.cleared ? `${state.cleared} learned for good so far.` : ''}</p>
+    <p class="note">A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being right. ${state.cleared ? `${state.cleared} learned for good so far.` : ''}</p>
     ${cards.length ? `<ul class="list">${cards.slice(0, 12).map(c => `<li><span>${esc(anyItem(c.wid) ? itemLabel(anyItem(c.wid)) : c.wid)}</span><span>${when(c.due)} · step ${c.box + 1} of ${REVIEW_DAYS.length}</span></li>`).join('')}</ul>` : '<p class="note">Nothing to review yet.</p>'}
   </section>
   <section>
@@ -986,7 +1114,7 @@ function renderParent() {
   </section>
   <section>
     <h2>Start over</h2>
-    <p class="note">Clears levels, caught notes, review and rounds. Keeps the name, settings and sync.</p>
+    <p class="note">Clears levels, learned notes, review and rounds. Keeps the name, settings and sync.</p>
     <div class="row-btns">${confirmWipe ? `<button class="ghost danger" data-act="wipe-yes">Yes, erase all progress</button><button class="link" data-act="wipe-no">Cancel</button>` : `<button class="ghost danger" data-act="wipe">Reset all progress</button>`}</div>
   </section>
   ${renderSync()}
@@ -1029,6 +1157,8 @@ const ACTIONS = {
   start() { startSession(); window.scrollTo?.({ top: 0 }); },
   check() { startCheck(); window.scrollTo?.({ top: 0 }); },
   next() { next(); },
+  'row-letter'(d) { rowPress(d.l); },
+  'row-hear'() { playRow(sess.probs[sess.i]); },
   pick(d) { answer(+d.i); },
   say() { const p = sess?.probs[sess.i]; if (p) say(slideWords(p)); },
   replay() { const p = sess.probs[sess.i]; if (p.hear) playSeq(p.hear); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi); },
@@ -1045,6 +1175,7 @@ const ACTIONS = {
   lvl(d) { const v = Math.max(1, Math.min(maxLevel(d.k), levelNow(d.k) + +d.d)); state.levels[d.k] = v; state.rec[d.k] = []; save(); render(); },
   per(d) { state.perSession = +d.n; save(); render(); },
   autospeak(d) { state.autoSpeak = d.v === '1'; save(); render(); },
+  answerwith(d) { state.answerWith = d.v; save(); render(); },
   realpiano(d) { state.realPiano = d.v === '1'; save(); render(); },
   speed(d) { state.speed = d.v; save(); render(); },
   'topic-reset'(d) { confirmTopic = d.k; render(); },
@@ -1052,7 +1183,7 @@ const ACTIONS = {
   'topic-reset-yes'(d) { resetTopic(d.k); confirmTopic = null; save(); render(); },
   wipe() { confirmWipe = true; render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },
