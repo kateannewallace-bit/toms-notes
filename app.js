@@ -202,10 +202,9 @@ function noteProblem(p, it, k) {
   else if (roll < .6) mode = 'row';
   else if (roll < .75) mode = 'place';
   else if (roll < .9) mode = 'key';
-  else if (regionOf(c, s) === 'on') mode = 'row';
-  else mode = roll < .95 ? 'where' : 'count';
+  else mode = 'row';
   if (mode === 'row' && buildRow(p, it, k)) return;
-  if (mode === 'row') mode = LEVELS[k].slice(0, p.level).some(l => l.items.some(i => i.note && parseP(i.p).letter !== p.letter)) ? 'letters' : pick(['place', 'key', 'where', 'count']);
+  if (mode === 'row') mode = LEVELS[k].slice(0, p.level).some(l => l.items.some(i => i.note && parseP(i.p).letter !== p.letter)) ? 'letters' : pick(['place', 'key']);
   // the grown-ups' setting: answer with piano keys instead of letter buttons
   if (mode === 'letters' && state.answerWith === 'piano' && p.kind !== 'check') mode = 'key';
   if (mode === 'key') {
@@ -227,23 +226,9 @@ function noteProblem(p, it, k) {
   }
   p.mode = 'choice';
   delete p.lo; delete p.hi;
-  if (mode === 'where') {
-    p.prompt = 'Where is this note head?';
-    const led = ledgersFor(c, s), on = onLine(c, s);
-    p.choices = [
-      { t: 'On a ledger line', ok: on && led > 0 },
-      { t: 'In a space next to a ledger line', ok: !on && led > 0 },
-      { t: 'No ledger line needed', ok: led === 0 },
-    ];
-  } else if (mode === 'count') {
-    p.prompt = 'How many ledger lines does this note need?';
-    p.choices = [0, 1, 2, 3].map(x => ({ t: String(x), ok: x === ledgersFor(c, s) }));
-    p.layout = 'nums';
-  } else {
-    p.prompt = 'What note is this?';
-    p.layout = 'letters';
-    p.choices = LETTER_CHOICES().map(l => ({ t: l, ok: l === p.letter }));
-  }
+  p.prompt = 'What note is this?';
+  p.layout = 'letters';
+  p.choices = LETTER_CHOICES().map(l => ({ t: l, ok: l === p.letter }));
 }
 // A row of notes on one staff, read left to right, one button press per note. The row is a short pattern that repeats: C D C D C D.
 // The pattern holds this note plus others already met on the same clef, close enough to fit one stretch of keys.
