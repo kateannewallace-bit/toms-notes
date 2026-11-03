@@ -205,7 +205,7 @@ function noteProblem(p, it, k) {
   else if (regionOf(c, s) === 'on') mode = 'row';
   else mode = roll < .95 ? 'where' : 'count';
   if (mode === 'row' && buildRow(p, it, k)) return;
-  if (mode === 'row') mode = 'letters';
+  if (mode === 'row') mode = LEVELS[k].slice(0, p.level).some(l => l.items.some(i => i.note && parseP(i.p).letter !== p.letter)) ? 'letters' : pick(['place', 'key', 'where', 'count']);
   // the grown-ups' setting: answer with piano keys instead of letter buttons
   if (mode === 'letters' && state.answerWith === 'piano' && p.kind !== 'check') mode = 'key';
   if (mode === 'key') {
@@ -555,9 +555,10 @@ function buildSession() {
     const cur = LEVELS[k][L - 1].items, earlier = LEVELS[k].slice(0, L - 1).flatMap(l => l.items);
     const review = earlier.length && Math.random() < .3;
     let pool = review ? earlier : cur;
-    // a level with few notes, like Middle C alone, can ask each one more often
-    const limit = Math.max(2, Math.ceil(n / (cur.length + earlier.length)));
-    pool = pool.filter(it => (used.get(it.wid) || 0) < limit && (seenThisRound(it) || newCount < MAX_NEW));
+    // A note comes up at most twice a round, so a level with few notes makes a short round rather than a repetitive one.
+    // Other exercises make a fresh question each time, so they can repeat more to fill the round.
+    const limit = it => it.note || it.twin ? 2 : Math.max(2, Math.ceil(n / (cur.length + earlier.length)));
+    pool = pool.filter(it => (used.get(it.wid) || 0) < limit(it) && (seenThisRound(it) || newCount < MAX_NEW));
     if (!pool.length) continue;
     // new things first, then the shakiest
     const weigh = it => (!isSeen(it.wid) ? 6 : isKnown(it.wid) ? 1 : 4) / (1 + (used.get(it.wid) || 0));
@@ -1026,14 +1027,13 @@ function renderDone() {
   }
   const score = sess.results.filter(Boolean).length, n = sess.results.length;
   const pct = n ? score / n : 0, tier = pct >= .9 ? 0 : pct >= .7 ? 1 : pct >= .4 ? 2 : 3;
-  if (!sess.cheer) { sess.cheer = pick(CHEERS[tier]); sess.hands = pick(AT_PIANO[pick(sess.probs.filter(p => AT_PIANO[p.topic])).topic]); }
+  if (!sess.cheer) sess.cheer = pick(CHEERS[tier]);
   const ups = lastChanges.filter(c => c[1] === 'up');
   return `<h1>${esc(greet(sess.cheer.head))}</h1>
   <p class="story left">${esc(sess.cheer.line)}</p>
   <p class="meta">${score} of ${n} all right on the first try.${sess.learned.length ? ` ${sess.learned.length} newly learned.` : ''}</p>
   <div class="stars">${sess.results.map(starSvg).join('')}</div>
   ${ups.length ? `<section><h2>Next level</h2><ul class="ups">${ups.map(([k]) => `<li>${esc(TOPIC[k].name)}: ${esc(LEVELS[k][state.levels[k] - 1].name)}</li>`).join('')}</ul></section>` : ''}
-  <section><h2>Away from the screen</h2><p class="off">${esc(sess.hands)}</p></section>
   <div class="row-btns"><button class="start" data-act="start">Again!</button><button class="ghost" data-act="home">Home</button></div>`;
 }
 function renderSong() {

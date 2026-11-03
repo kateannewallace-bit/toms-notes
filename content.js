@@ -1,4 +1,4 @@
-/* What Tom learns: topics, a short lesson for each level, songs, cheers and things to do at the real piano.
+/* What Tom learns: topics, a short lesson for each level, songs and cheers.
    Add content here rather than new mechanics. */
 
 const n = (clef, p) => ({ note: 1, clef, p });
@@ -231,15 +231,3 @@ const CHEERS = [
   [{ head: 'Keep going', line: 'The notes you missed will come back so you can practice them.' }],
   [{ head: 'That was a hard one', line: 'The notes you missed come back tomorrow. Going slowly is how you get good.' }],
 ];
-
-/* One thing to do at the real piano or away from a screen, after a round. */
-const AT_PIANO = {
-  path: ['At the piano: put a finger on Middle C and walk up to G, saying each letter. Now walk back down to F below it.', 'Draw a staff on real paper. Draw Middle C on it. Ask a grown-up to name a note you draw next to it, then check them.', 'Make a staff on the floor with five long ropes or strips of tape. Add a short strip for Middle C and stand on it.', 'Find every C on the piano, from one end to the other. How many are there?', 'Put both thumbs on Middle C. Walk your right hand up and your left hand down at the same time.'],
-  reading: ['Sit in the middle of the bench. Play Middle C with your right thumb and the C below it with your left little finger.', 'Open any music book. Find one note you can name, and play it.'],
-  keys: ['Close your eyes and feel for a group of two black keys. Play the key just to the left of them. That’s a C.', 'Play every C on the piano, low to high.'],
-  rhythm: ['Clap a quarter note, then a half note, then a whole note. Keep your heartbeat steady.', 'Walk around the room: each step is a beat. Now clap a half note every two steps.'],
-  measure: ['March and count to 4. Stamp on 1. Now waltz and count to 3.', 'Find a song you know and clap on beat 1 of each bar.'],
-  accidentals: ['Play C, then C sharp, then D. Each one is the very next key.', 'Play a whole tune on black keys only. You can’t go wrong.'],
-  marks: ['Play one note as soft as you can, then as loud as you can.', 'Play Hot Cross Buns very short and bouncy, then very smooth. Which do you like better?'],
-  ears: ['Have someone play two keys while your eyes are shut. Which was higher?', 'Sing a tune and draw a line in the air that goes up and down with it.'],
-};

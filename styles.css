@@ -234,7 +234,6 @@ svg.markvis { display: block; width: 100%; max-width: 280px; height: auto; margi
 .song-lines { display: flex; flex-direction: column; gap: 2px; }
 .song-keys { position: sticky; bottom: 8px; background: var(--board); padding: 8px 0 0; border-radius: 8px; }
 .ghost[aria-pressed="true"] { border-color: var(--green); color: var(--green); }
-.off { margin: 0; font-size: 1.1rem; }
 .song-ctrl { gap: 8px; }
 .song-ctrl .ghost { padding: 6px 12px; font-size: .92rem; }
 
