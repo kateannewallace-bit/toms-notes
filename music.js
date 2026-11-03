@@ -255,6 +255,7 @@ function click(when = 0, accent = false) {
 }
 // Plays [{ midi, beats, vol }]; rests have no midi. onNote(i) fires as each one sounds.
 // With metro, a metronome counts in for a bar and keeps ticking under the music, so lengths can be heard against the beat.
+// metro.tail adds a full bar of ticks after the bar the music ends in, so the beat carries on past the last note.
 function playSeq(list, bpm = 96, onNote, metro) {
   hush();
   const beat = 60 / bpm, perBar = metro?.perBar || 4, lead = metro ? perBar * beat : 0;
@@ -264,7 +265,10 @@ function playSeq(list, bpm = 96, onNote, metro) {
     if (onNote) seqTimers.push(setTimeout(() => onNote(i), t * 1000));
     t += n.beats * beat;
   });
-  if (metro) for (let b = 0; b * beat < t - .001; b++) click(b * beat, b % perBar === 0);
+  if (metro) {
+    const bars = Math.ceil(t / beat / perBar - .001) + (metro.tail ? 1 : 0);
+    for (let b = 0; b < bars * perBar; b++) click(b * beat, b % perBar === 0);
+  }
   if (onNote) seqTimers.push(setTimeout(() => onNote(-1), t * 1000));
   return t;
 }

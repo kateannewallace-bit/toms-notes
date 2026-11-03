@@ -161,9 +161,9 @@ function say(text) {
 const rec = wid => state.words[wid];
 const isKnown = wid => { const w = rec(wid); return !!w && (!!w.k || (w.r || 0) - (w.m || 0) >= 2); };
 const isSeen = wid => !!rec(wid);
-// Rhythm questions play against a metronome: a slow beat, with a bar counted in first.
+// Rhythm questions play against a metronome: a slow beat, a bar counted in first, and a bar after the music.
 const BEAT_BPM = 72;
-const playHear = (list, onBeat) => playSeq(list, onBeat ? BEAT_BPM : undefined, null, onBeat ? {} : null);
+const playHear = (list, onBeat) => playSeq(list, onBeat ? BEAT_BPM : undefined, null, onBeat ? { tail: true } : null);
 const knownNotes = () => new Set(ORDER.flatMap(k => allItems(k)).filter(i => i.note && !i.keyOnly && isKnown(i.wid)).map(i => `${i.clef}:${i.p}`));
 
 /* ---------- listening to the real piano ---------- */
