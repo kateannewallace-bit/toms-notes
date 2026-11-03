@@ -20,10 +20,11 @@ const allItems = k => LEVELS[k].flatMap(l => l.items);
 const findItem = (k, wid) => allItems(k).find(i => i.wid === wid);
 const anyItem = wid => { for (const k of ORDER) { const i = findItem(k, wid); if (i) return i; } return null; };
 const midCName = p => p === 'C4' ? 'Middle C' : prettyName(p);
-const DUR_NAME = { w: 'Whole note', h: 'Half note', q: 'Quarter note', e: 'Eighth note', 'h.': 'Dotted half note', 'q.': 'Dotted quarter note' };
-const REST_NAME = { w: 'Whole rest', h: 'Half rest', q: 'Quarter rest' };
-const beatWord = b => b === 0.5 ? 'half a beat' : b === 1.5 ? 'one and a half beats' : b === 1 ? '1 beat' : `${b} beats`;
-const beatNum = b => b === 0.5 ? '½' : b === 1.5 ? '1½' : String(b);
+const DUR_NAME = { w: 'Whole note', h: 'Half note', q: 'Quarter note', e: 'Eighth note', s: 'Sixteenth note', 'h.': 'Dotted half note', 'q.': 'Dotted quarter note' };
+const REST_NAME = { w: 'Whole rest', h: 'Half rest', q: 'Quarter rest', e: 'Eighth rest' };
+const durPhrase = d => `${/^[e]/i.test(DUR_NAME[d]) ? 'an' : 'a'} ${DUR_NAME[d].toLowerCase()}`;
+const beatWord = b => b === 0.25 ? 'a quarter of a beat' : b === 0.5 ? 'half a beat' : b === 1.5 ? 'one and a half beats' : b === 1 ? '1 beat' : `${b} beats`;
+const beatNum = b => b === 0.25 ? '¼' : b === 0.5 ? '½' : b === 1.5 ? '1½' : String(b);
 const itemLabel = i => i.note ? `${prettySym(i.p)} (${CLEF[i.clef].name}${i.keyOnly ? ', on the keys' : ''})` : i.twin ? `Twin ${prettySym(i.p)}` : i.dur ? DUR_NAME[i.dur] : i.rest ? REST_NAME[i.rest] : i.mark ? MARKS[i.mark].word : i.whiteKey ? `Key ${i.whiteKey}` : i.group ? `Group of ${i.group} black keys` : i.findKey ? prettySym(i.findKey + '4') : i.wid;
 
 /* ---------- state ---------- */
@@ -41,6 +42,8 @@ function normalize(s) {
   s = Object.assign(defaultState(), s || {});
   s.levels = Object.assign(defaultState().levels, s.levels);
   s.on = Object.assign({}, s.on);
+  s.mastered = Object.assign({}, s.mastered);
+  for (const k of Object.keys(s.mastered)) if (LEVELS[k] && (s.levels[k] || 1) < LEVELS[k].length) { delete s.mastered[k]; s.levels[k]++; }
   // The note topics were once ledger, treble and bass. They are one path now: known notes keep counting, and review cards carry over.
   if (s.on.ledger || s.on.treble || s.on.bass || s.levels.ledger) {
     delete s.on.ledger; delete s.on.treble; delete s.on.bass;
@@ -158,6 +161,9 @@ function say(text) {
 const rec = wid => state.words[wid];
 const isKnown = wid => { const w = rec(wid); return !!w && (!!w.k || (w.r || 0) - (w.m || 0) >= 2); };
 const isSeen = wid => !!rec(wid);
+// Rhythm questions play against a metronome: a slow beat, with a bar counted in first.
+const BEAT_BPM = 72;
+const playHear = (list, onBeat) => playSeq(list, onBeat ? BEAT_BPM : undefined, null, onBeat ? {} : null);
 const knownNotes = () => new Set(ORDER.flatMap(k => allItems(k)).filter(i => i.note && !i.keyOnly && isKnown(i.wid)).map(i => `${i.clef}:${i.p}`));
 
 /* ---------- listening to the real piano ---------- */
@@ -175,7 +181,7 @@ function micNote(midi) {
   if (screen !== 'play' || !sess) return;
   const p = sess.probs[sess.i];
   if (p.mode === 'row') rowPress(keyName(midi));
-  else if (p.mode === 'key') tapKey(midi);
+  else if (p.mode === 'key' && !p.onScreen) tapKey(midi);
 }
 mic.onNote = midi => micNote(midi);
 mic.onStatus = () => { if (screen === 'play' || screen === 'song' || screen === 'parent') render(); };
@@ -194,9 +200,10 @@ const micProblem = () => !listenMode() || mic.status === 'on' ? '' : `<p class="
 // Every problem: { mode, prompt, choices[{ t | vis, ok }], layout, ... }. There is always exactly one defensible answer.
 const LETTER_CHOICES = () => 'ABCDEFG'.split('');
 const smallRhythm = (list, o = {}) => staffSvg({ clef: 't', S: o.S || 11, width: o.width || 240, time: o.time, items: list.map(x => x === '|' ? { bar: 1 } : x[0] === 'r' ? { r: x.slice(1) } : x === 'gap' ? { gap: 'q' } : { p: 'G4', d: x }), noClef: !o.clef, lo: stepOf('E4'), hi: stepOf('F5'), cl: 'rh' });
-const RHYTHM_AT = lv => lv >= 4 ? ['q', 'h', 'w', 'e', 'h.', 'q.'] : lv >= 2 ? ['q', 'h', 'w', 'e'] : ['q', 'h', 'w'];
-const barBeats = bar => bar.reduce((t, d) => t + BEATS[d], 0);
-const seqOf = (list, midi = 67, bpm) => list.map(d => ({ midi, beats: BEATS[d] }));
+const RHYTHM_AT = lv => lv >= 10 ? ['q', 'h', 'w', 'e', 's', 'h.', 'q.'] : lv >= 4 ? ['q', 'h', 'w', 'e', 'h.', 'q.'] : lv >= 2 ? ['q', 'h', 'w', 'e'] : ['q', 'h', 'w'];
+const beatsOf = d => BEATS[d[0] === 'r' ? d.slice(1) : d];
+const barBeats = bar => bar.reduce((t, d) => t + beatsOf(d), 0);
+const seqOf = (list, midi = 67) => list.map(d => d[0] === 'r' ? { beats: beatsOf(d) } : { midi, beats: BEATS[d] });
 
 // Notes already asked this round, so a new note's second question can be a different kind.
 const roundSeen = new Set();
@@ -207,11 +214,12 @@ function makeProblem(k, level, seed, kind = 'current', wid) {
   const p = { topic: k, level, seed, kind, wid: item.wid, item, tries: 0, wrong: [], done: false, choices: [] };
   if (item.note) noteProblem(p, item, k);
   else if (item.twin) twinProblem(p, item);
-  else if (item.group || item.whiteKey || item.middle || item.findKey) keyProblem(p, item);
-  else if (item.dur || item.rest || item.sum || item.hearRhythm) rhythmProblem(p, item);
-  else if (item.fact || item.fill || item.wrongBar) measureProblem(p, item);
-  else if (item.accSym || item.enh) accidentalProblem(p, item);
-  else if (item.mark) markProblem(p, item);
+  else if (item.group || item.whiteKey || item.middle || item.findKey || item.nameBlack) keyProblem(p, item);
+  else if (item.keyTask) keyTaskProblem(p, item);
+  else if (item.dur || item.rest || item.sum || item.hearRhythm || item.tie) rhythmProblem(p, item);
+  else if (item.fact || item.fill || item.wrongBar || item.beatQ || item.timeSym) measureProblem(p, item);
+  else if (item.accSym || item.enh || item.cancel || item.ks || item.ksPlay) accidentalProblem(p, item);
+  else if (item.mark || item.markBack) markProblem(p, item);
   else if (item.ear || item.see) earProblem(p, item);
   rng = Math.random;
   return p;
@@ -319,6 +327,14 @@ function keyProblem(p, it) {
       p.okMidi = m => m % 12 === pc;
       p.answerText = () => `${l}: ${{ C: 'just left of the two black keys', D: 'between the two black keys', E: 'just right of the two black keys', F: 'just left of the three black keys', G: 'between the first two of the three black keys', A: 'between the last two of the three black keys', B: 'just right of the three black keys' }[l]}.`;
     }
+  } else if (it.nameBlack) {
+    const blacks = [61, 63, 66, 68, 70], m = pick(blacks);
+    p.mode = 'choice'; p.from = stepOf('C4'); p.whites = 8;
+    p.keyStrip = { from: stepOf('C4'), whites: 8, marks: { [m]: 'hl' }, letters: false, star: false };
+    p.prompt = 'What is this black key called?';
+    p.choices = shuffle([m, ...shuffle(blacks.filter(x => x !== m)).slice(0, 2)]).map(x => ({ t: keyName(x), ok: x === m }));
+    p.hearMidi = m;
+    p.answerText = () => `That black key is ${keyName(m)}.`;
   } else if (it.middle) {
     p.whites = 15; p.from = stepOf('C3');
     p.prompt = 'Tap Middle C.';
@@ -333,29 +349,93 @@ function keyProblem(p, it) {
     p.answerText = () => `${prettySym(it.findKey + '4')} is this black key.`;
   }
 }
+// Questions about where one key is from another. These need the exact key, and a microphone can't always tell octaves apart,
+// so they stay on the on-screen keys even in Real piano mode.
+function keyTaskProblem(p, it) {
+  const task = it.keyTask, up = /Up|above/.test(task);
+  p.mode = 'key'; p.onScreen = true; p.whites = 15; p.from = stepOf('C3');
+  const dir = up ? 'up' : 'down';
+  if (task === 'above' || task === 'below') {
+    const s = stepOf('C4') + (up ? 1 : -1) * (1 + Math.floor(rng() * 7)), l = letterOf(s);
+    p.pianoOpts = { letters: false, star: true };
+    p.targetMidi = whiteMidi(s);
+    p.prompt = `Tap the ${l} ${task} Middle C.`;
+    p.answerText = () => `This is the ${l} ${task} Middle C.`;
+    return;
+  }
+  p.pianoOpts = { letters: 'c', star: false };
+  if (task.startsWith('octave')) {
+    const s = stepOf('C4') - 3 + Math.floor(rng() * 7);
+    p.from = up ? s - 3 : s - 11;
+    p.litMidi = whiteMidi(s); p.targetMidi = whiteMidi(s + (up ? 7 : -7));
+    p.prompt = `This key is ${letterOf(s)}. Tap the ${letterOf(s)} one octave ${up ? 'higher' : 'lower'}.`;
+    p.answerText = () => `An octave ${up ? 'up' : 'down'} from ${letterOf(s)} is the next ${letterOf(s)} ${up ? 'to the right' : 'to the left'}.`;
+    return;
+  }
+  if (task.startsWith('int')) {
+    const size = +task[3], word = { 4: 'fourth', 5: 'fifth', 6: 'sixth', 7: 'seventh' }[size];
+    const s = stepOf('C4') + Math.floor(rng() * 7), to = s + (up ? 1 : -1) * (size - 1), walk = [];
+    for (let x = s; ; x += up ? 1 : -1) { walk.push(letterOf(x)); if (x === to) break; }
+    p.from = up ? s - 3 : s - 11;
+    p.litMidi = whiteMidi(s); p.targetMidi = whiteMidi(to);
+    p.prompt = `This key is ${letterOf(s)}. Tap a ${word} ${dir}.`;
+    p.answerText = () => `Count ${size} letters ${dir}: ${walk.join(', ')}.`;
+    return;
+  }
+  p.whites = 11;
+  if (task.startsWith('step') || task.startsWith('skip')) {
+    const skip = task.startsWith('skip'), s = stepOf('C4') + Math.floor(rng() * 7), to = s + (up ? 1 : -1) * (skip ? 2 : 1);
+    p.from = s - 5;
+    p.litMidi = whiteMidi(s); p.targetMidi = whiteMidi(to);
+    p.prompt = `This key is ${letterOf(s)}. Tap a ${skip ? 'skip' : 'step'} ${dir}.`;
+    p.answerText = () => `A ${skip ? 'skip' : 'step'} ${dir} from ${letterOf(s)} is ${letterOf(to)}.`;
+    return;
+  }
+  // half and whole steps can start on any key, black or white, and can land on either
+  const whole = task.startsWith('whole'), start = 60 + Math.floor(rng() * 12), to = start + (up ? 1 : -1) * (whole ? 2 : 1);
+  p.from = stepOf('C4') - 5 + (start >= 66 ? 3 : 0);
+  p.litMidi = start; p.targetMidi = to;
+  p.prompt = `Tap a ${whole ? 'whole' : 'half'} step ${dir} from the lit key.`;
+  p.answerText = () => whole ? `A whole step ${dir} leaves one key in between: ${keyName(to)}.` : `A half step ${dir} is the very next key: ${keyName(to)}.`;
+}
+function tiedNotes(a, b) {
+  return staffSvg({ clef: 't', S: 15, width: 260, noClef: true, even: true, lo: stepOf('E4'), hi: stepOf('F5'), items: [{ p: 'G4', d: a }, { p: 'G4', d: b }],
+    extra: ({ x, Y, S }) => `<path class="tie" d="M${x[0] + S * .4} ${Y(stepOf('G4')) + S * .7}Q${(x[0] + x[1]) / 2} ${Y(stepOf('G4')) + S * 2} ${x[1] - S * .4} ${Y(stepOf('G4')) + S * .7}"/>` });
+}
 function rhythmProblem(p, it) {
   p.mode = 'choice';
+  p.onBeat = true;
   if (it.sum) {
-    const known = it.sum === 2 ? ['q', 'h', 'h.', 'q.'] : ['q', 'h', 'e'];
+    const groups = { 1: [['q'], ['h'], ['e', 'e']], 2: [['q'], ['h'], ['h.'], ['q.', 'e']], 3: [['q'], ['h'], ['rq'], ['rh'], ['e', 'e'], ['re', 'e']], 4: [['s', 's', 's', 's'], ['e', 'e'], ['q'], ['q.', 'e'], ['h']] }[it.sum];
     let list;
-    do { list = Array.from({ length: 2 + Math.floor(rng() * 2) }, () => pick(known)).flatMap(d => d === 'e' ? ['e', 'e'] : [d]); } while (barBeats(list) % 1 !== 0 || barBeats(list) > 8);
+    do { list = Array.from({ length: 2 + Math.floor(rng() * 2) }, () => pick(groups)).flat(); } while (barBeats(list) > 8);
     const ans = barBeats(list);
     p.vis = smallRhythm(list, { width: 280, S: 13 });
     p.prompt = 'How many beats altogether?';
     p.layout = 'nums';
     p.choices = shuffle([ans, ans + 1, ans + 2, Math.max(1, ans - 1) === ans ? ans + 3 : Math.max(1, ans - 1)]).map(x => ({ t: String(x), ok: x === ans }));
-    p.answerText = () => `${list.map(d => beatNum(BEATS[d])).join(' + ')} = ${ans}`;
+    p.answerText = () => `${list.map(d => beatNum(beatsOf(d))).join(' + ')} = ${ans}`;
     p.hear = seqOf(list);
   } else if (it.hearRhythm) {
-    const bank = [['q', 'q', 'q', 'q'], ['h', 'h'], ['q', 'q', 'h'], ['h', 'q', 'q'], ['q', 'h', 'q'], ['w'], ['e', 'e', 'q', 'q', 'q'], ['q', 'q', 'e', 'e', 'q'], ['h.', 'q']];
+    const bank = { 1: [['q', 'q', 'q', 'q'], ['h', 'h'], ['q', 'q', 'h'], ['h', 'q', 'q'], ['q', 'h', 'q'], ['w'], ['h.', 'q']],
+      2: [['e', 'e', 'q', 'q', 'q'], ['q', 'q', 'e', 'e', 'q'], ['q', 'e', 'e', 'q', 'q'], ['e', 'e', 'e', 'e', 'h'], ['h', 'e', 'e', 'e', 'e'], ['q', 'e', 'e', 'h']],
+      3: [['q.', 'e', 'h'], ['h', 'q.', 'e'], ['q.', 'e', 'q.', 'e'], ['q', 'q.', 'e', 'q'], ['h.', 'e', 'e']] }[it.hearRhythm === 1 ? 1 : it.hearRhythm];
     const opts = shuffle(bank).slice(0, 3), right = pick(opts);
     p.prompt = 'Listen. Which rhythm did you hear?';
     p.layout = 'vis';
     p.hear = seqOf(right); p.autoHear = true;
     p.choices = opts.map(o => ({ ok: o === right, vis: smallRhythm(o, { width: 220, S: 10, time: [4, 4] }) }));
     p.answerText = () => 'Listen again and tap along with it.';
+  } else if (it.tie) {
+    const [a, b] = pick([['h', 'q'], ['q', 'q'], ['h', 'h'], ['q', 'e'], ['w', 'q'], ['h.', 'q']]), ans = BEATS[a] + BEATS[b];
+    p.vis = tiedNotes(a, b);
+    p.prompt = 'How many beats do you hold this?';
+    p.layout = 'nums';
+    p.choices = [1.5, 2, 3, 4, 5].map(x => ({ t: beatNum(x), ok: x === ans }));
+    p.hear = [{ midi: 67, beats: ans }];
+    p.answerText = () => `${beatNum(BEATS[a])} + ${beatNum(BEATS[b])} = ${beatNum(ans)} beats, played as one note.`;
   } else if (it.rest) {
-    const known = ['q', 'h', 'w'];
+    const known = p.level >= 6 ? ['q', 'h', 'w', 'e'] : ['q', 'h', 'w'];
     p.vis = smallRhythm(['r' + it.rest], { width: 180, S: 15 });
     if (rng() < .55 || p.kind === 'check') {
       p.prompt = 'What is this rest?';
@@ -363,8 +443,9 @@ function rhythmProblem(p, it) {
     } else {
       p.prompt = 'How many beats of silence, in 4/4 time?';
       p.layout = 'nums';
-      p.choices = [1, 2, 4].map(x => ({ t: String(x), ok: x === BEATS[it.rest] }));
+      p.choices = (p.level >= 6 ? [.5, 1, 2, 4] : [1, 2, 4]).map(x => ({ t: beatNum(x), ok: x === BEATS[it.rest] }));
     }
+    p.hear = [{ beats: BEATS[it.rest] }, { midi: 67, beats: 1 }];
     p.answerText = () => `${REST_NAME[it.rest]}: ${beatWord(BEATS[it.rest])} of silence.`;
   } else {
     const known = RHYTHM_AT(p.level);
@@ -401,27 +482,90 @@ function measureProblem(p, it) {
     p.choices = [2, 3, 4, 6].map(x => ({ t: String(x), ok: x === top }));
     p.answerText = () => `The top number says ${top} beats in each bar.`;
   } else if (it.fill) {
-    const opts = it.fill === 4
-      ? [[['h', 'q'], 'q'], [['q', 'q', 'q'], 'q'], [['h'], 'h'], [['q', 'q'], 'h'], [['q'], 'h.']]
-      : [[['q', 'q'], 'q'], [['h'], 'q'], [['q'], 'h']];
-    const [have, miss] = pick(opts);
-    p.vis = smallRhythm([...have, 'gap', '|'], { width: 300, S: 12, time: [it.fill, 4] });
-    p.prompt = `Which note fills this ${it.fill}/4 bar?`;
+    const set = {
+      4: { time: [4, 4], opts: [[['h', 'q'], 'q'], [['q', 'q', 'q'], 'q'], [['h'], 'h'], [['q', 'q'], 'h'], [['q'], 'h.']], list: ['q', 'h', 'h.', 'w'] },
+      3: { time: [3, 4], opts: [[['q', 'q'], 'q'], [['h'], 'q'], [['q'], 'h']], list: ['q', 'h', 'h.'] },
+      2: { time: [2, 4], opts: [[['q'], 'q'], [['e', 'e'], 'q']], list: ['e', 'q', 'h'] },
+      '4e': { time: [4, 4], opts: [[['q', 'q', 'q', 'e'], 'e'], [['h', 'q', 'e'], 'e'], [['h', 'e', 'e'], 'q'], [['q.', 'e', 'q'], 'q']], list: ['e', 'q', 'h', 'h.'] },
+      6: { time: [6, 8], opts: [[['q.', 'e', 'e'], 'e'], [['q.'], 'q.'], [['q', 'e', 'q'], 'e'], [['e', 'e', 'e'], 'q.']], list: ['e', 'q', 'q.', 'h'] },
+    }[it.fill];
+    const [have, miss] = pick(set.opts), label = set.time.join('/');
+    p.vis = smallRhythm([...have, 'gap', '|'], { width: 300, S: 12, time: set.time });
+    p.prompt = `Which note fills this ${label} bar?`;
     p.layout = 'vis';
-    p.choices = (it.fill === 4 ? ['q', 'h', 'h.', 'w'] : ['q', 'h', 'h.']).map(d => ({ ok: d === miss, label: DUR_NAME[d], vis: smallRhythm([d], { width: 90, S: 10 }) }));
-    p.answerText = () => `${beatNum(barBeats(have))} beats are there, and the bar needs ${it.fill}. The missing note is ${DUR_NAME[miss].toLowerCase()}: ${beatWord(BEATS[miss])}.`;
-  } else {
-    const goods = [['q', 'q', 'h'], ['h', 'h'], ['q', 'q', 'q', 'q'], ['h.', 'q'], ['w'], ['q', 'h', 'q']];
-    const bads = [['q', 'q', 'q'], ['h', 'q', 'q', 'q'], ['w', 'q'], ['h', 'h', 'q'], ['q', 'q']];
+    p.choices = set.list.map(d => ({ ok: d === miss, label: DUR_NAME[d], vis: smallRhythm([d], { width: 90, S: 10 }) }));
+    p.answerText = () => set.time[1] === 8 ? `A 6/8 bar holds six eighth notes. The missing note is ${durPhrase(miss)}.` : `${beatNum(barBeats(have))} beats are there, and the bar needs ${set.time[0]}. The missing note is ${durPhrase(miss)}: ${beatWord(BEATS[miss])}.`;
+  } else if (it.wrongBar) {
+    const top = it.wrongBar === 1 ? 4 : it.wrongBar;
+    const { goods, bads } = {
+      4: { goods: [['q', 'q', 'h'], ['h', 'h'], ['q', 'q', 'q', 'q'], ['h.', 'q'], ['w'], ['q', 'h', 'q']], bads: [['q', 'q', 'q'], ['h', 'q', 'q', 'q'], ['w', 'q'], ['h', 'h', 'q'], ['q', 'q']] },
+      3: { goods: [['q', 'q', 'q'], ['h', 'q'], ['q', 'h'], ['h.'], ['e', 'e', 'q', 'q']], bads: [['q', 'q'], ['h', 'h'], ['q', 'q', 'q', 'q'], ['h.', 'q'], ['w']] },
+      2: { goods: [['q', 'q'], ['h'], ['e', 'e', 'q'], ['q', 'e', 'e']], bads: [['q'], ['h', 'q'], ['q', 'q', 'q'], ['w']] },
+    }[top];
     const bad = pick(bads), g = shuffle(goods).slice(0, 2);
-    p.prompt = 'Which bar does NOT have 4 beats?';
+    p.prompt = `Which bar does NOT have ${top} beats?`;
     p.layout = 'vis';
-    p.choices = shuffle([bad, ...g]).map(b => ({ ok: b === bad, vis: smallRhythm([...b, '|'], { width: 200, S: 10, time: [4, 4] }) }));
-    p.answerText = () => `That bar adds up to ${barBeats(bad)} beats, not 4.`;
+    p.choices = shuffle([bad, ...g]).map(b => ({ ok: b === bad, vis: smallRhythm([...b, '|'], { width: 200, S: 10, time: [top, 4] }) }));
+    p.answerText = () => `That bar adds up to ${barBeats(bad)} beats, not ${top}.`;
+  } else if (it.beatQ) {
+    const bars = it.beatQ === 1 ? [['q', 'q', 'q', 'q']] : [['h', 'q', 'q'], ['q', 'h', 'q'], ['q', 'q', 'h'], ['h.', 'q'], ['q', 'h.']];
+    const bar = pick(bars), at = it.beatQ === 1 ? Math.floor(rng() * 4) : 1 + Math.floor(rng() * (bar.length - 1));
+    const beat = 1 + bar.slice(0, at).reduce((t, d) => t + BEATS[d], 0);
+    p.vis = staffSvg({ clef: 't', S: 14, width: 320, time: [4, 4], lo: stepOf('E4'), hi: stepOf('F5'), even: true, items: [...bar.map((d, i) => ({ p: 'G4', d, cls: i === at ? 'now' : '' })), { bar: 1 }] });
+    p.prompt = 'Which beat does the blue note start on?';
+    p.layout = 'nums';
+    p.choices = [1, 2, 3, 4].map(x => ({ t: String(x), ok: x === beat }));
+    p.answerText = () => `Counting from the start of the bar, the blue note starts on beat ${beat}.`;
+  } else {
+    const cut = rng() < .5, ans = cut ? 2 : 4;
+    p.vis = staffSvg({ clef: 't', S: 14, width: 300, lo: stepOf('E4'), hi: stepOf('F5'), items: cut ? [{ p: 'G4', d: 'h' }, { p: 'A4', d: 'h' }, { bar: 1 }] : [{ p: 'G4', d: 'q' }, { p: 'A4', d: 'q' }, { p: 'G4', d: 'h' }, { bar: 1 }],
+      extra: ({ S, yTop }) => `<text class="timesig" x="${S * 3.9}" y="${yTop + S * 2.9}" font-size="${S * 3.2}">C</text>${cut ? `<line class="st-bar" x1="${S * 3.9}" x2="${S * 3.9}" y1="${yTop - S * .5}" y2="${yTop + S * 4.5}"/>` : ''}` });
+    p.prompt = 'How many big beats are in each bar?';
+    p.layout = 'nums';
+    p.choices = [2, 3, 4, 6].map(x => ({ t: String(x), ok: x === ans }));
+    p.answerText = () => cut ? 'A C with a line through it is cut time: 2 big beats in each bar.' : 'A big C is common time, the same as 4/4: 4 beats in each bar.';
   }
 }
+const KEY_SIGS = { G: ['F#'], F: ['Bb'], D: ['F#', 'C#'], Bb: ['Bb', 'Eb'], A: ['F#', 'C#', 'G#'], Eb: ['Bb', 'Eb', 'Ab'] };
+const SIG_SPOT = { 'F#': 'F5', 'C#': 'C5', 'G#': 'G5', Bb: 'B4', Eb: 'E5', Ab: 'A4' };
+const keyWord = k => k.length > 1 ? `${k[0]} flat` : k;
+const sigGlyphs = (k, S, yTop, x0) => KEY_SIGS[k].map((a, i) => glyph(a[1] === '#' ? 'sharp' : 'flat', x0 + i * S * 1, yTop + (topOf('t') - stepOf(SIG_SPOT[a])) * S / 2 + S * .53, S)).join('');
+const sigStaff = (k, items = []) => staffSvg({ clef: 't', S: 15, width: 300, items, noteX: 230, lo: stepOf('C4'), hi: stepOf('G5'), extra: ({ S, yTop }) => sigGlyphs(k, S, yTop, S * 3.3) });
 function accidentalProblem(p, it) {
+  if (it.ksPlay) {
+    const k = it.ksPlay, changed = KEY_SIGS[k][0], letter = changed[0], s = stepOf(letter + '4');
+    p.mode = 'key'; p.whites = 11; p.from = s - 5;
+    p.pianoOpts = { letters: 'c', star: true };
+    p.vis = sigStaff(k, [{ p: letter + '4', d: 'q' }]);
+    p.targetMidi = midiOf(changed + '4');
+    p.prompt = `In the key of ${keyWord(k)}, find this note.`;
+    p.answerText = () => `In the key of ${keyWord(k)}, every ${letter} is played as ${prettySym(changed + '4')}.`;
+    return;
+  }
+  if (it.cancel) {
+    const [acc, letter] = pick([['#', 'F'], ['#', 'C'], ['#', 'G'], ['b', 'B'], ['b', 'E'], ['b', 'A']]), plain = letter + '4';
+    p.mode = 'key'; p.whites = 11; p.from = stepOf(plain) - 5;
+    p.pianoOpts = { letters: 'c', star: true };
+    p.vis = staffSvg({ clef: 't', S: 15, width: 300, even: true, items: [{ p: letter + acc + '4', d: 'q', acc }, { p: plain, d: 'q', acc: 'n', cls: 'now' }, { bar: 1 }] });
+    p.targetMidi = midiOf(plain);
+    p.prompt = 'Find the blue note.';
+    p.answerText = () => `The natural sign cancels the ${acc === '#' ? 'sharp' : 'flat'}, so the blue note is plain ${letter}.`;
+    return;
+  }
   p.mode = 'choice';
+  if (it.ks) {
+    const k = it.ks, keys = Object.keys(KEY_SIGS).slice(0, p.level <= 9 ? 2 : p.level === 10 ? 4 : 6), notes = KEY_SIGS[k].map(a => prettySym(a + '4')).join(', ');
+    p.vis = sigStaff(k);
+    if (rng() < .5) {
+      p.prompt = 'What major key has this key signature?';
+      p.choices = keys.map(x => ({ t: keyWord(x), ok: x === k }));
+    } else {
+      p.prompt = 'Which notes does this key signature change?';
+      p.choices = keys.map(x => ({ t: KEY_SIGS[x].map(a => prettySym(a + '4')).join(', '), ok: x === k }));
+    }
+    p.answerText = () => `The key of ${keyWord(k)} has ${notes}.`;
+    return;
+  }
   if (it.accSym) {
     const note = { sharp: 'G#4', flat: 'Bb4', natural: 'A4' }[it.accSym], acc = { sharp: '#', flat: 'b', natural: 'n' }[it.accSym];
     p.vis = staffSvg({ clef: 't', S: 16, width: 240, items: [{ p: note, acc }] });
@@ -430,13 +574,14 @@ function accidentalProblem(p, it) {
     p.answerText = () => ({ sharp: 'A sharp moves a note one key higher.', flat: 'A flat moves a note one key lower.', natural: 'A natural cancels a sharp or flat.' }[it.accSym]);
     return;
   }
-  const [a, b] = it.enh, flats = ['Db', 'Eb', 'Gb', 'Ab', 'Bb'].filter(x => x !== b);
-  const midi = midiOf(a + '4');
+  const [a, b] = it.enh, flats = (it.white ? ['C', 'E', 'F', 'B', 'D', 'G'] : ['Db', 'Eb', 'Gb', 'Ab', 'Bb']).filter(x => x !== b);
+  let midi = midiOf(a + '4');
+  if (midi < 60) midi += 12;  // C flat, on this stretch of keys
   p.prompt = `${prettySym(a + '4')} is the same key as…`;
   p.keyStrip = { from: stepOf('C4'), whites: 8, marks: { [midi]: 'hl' }, letters: 'all', star: false };
   p.choices = shuffle([b, ...shuffle(flats).slice(0, 2)]).map(x => ({ t: prettySym(x + '4'), ok: x === b }));
   p.hearMidi = midi;
-  p.answerText = () => `${prettySym(a + '4')} and ${prettySym(b + '4')} are the same black key.`;
+  p.answerText = () => `${prettySym(a + '4')} and ${prettySym(b + '4')} are the same key.`;
 }
 function markSvg(s, big) {
   const m = MARKS[s], h = big ? 96 : 76, w = big ? 240 : 180;
@@ -448,10 +593,12 @@ function markSvg(s, big) {
     if (m.touch === 'accent') return `<path class="hair thin" d="M${x[1] - S * .8} ${yTop - S * .9}L${x[1] + S * .8} ${yTop - S * .5}L${x[1] - S * .8} ${yTop - S * .1}"/>`;
     if (m.touch === 'slur') return `<path class="hair thin" d="M${x[0]} ${Y(stepOf('E4')) + S * 1}Q${(x[0] + x[2]) / 2} ${Y(stepOf('E4')) + S * 3} ${x[2]} ${Y(stepOf('E4')) + S * 1}"/>`;
     if (m.touch === 'fermata') return glyph('fermata', x[1] - S * 1.3, yTop - S * .3 + (648 / 250) * S - S * 2.6 + S * 2.2 - S, S * .9);
+    if (m.touch === 'tenuto') return `<line class="hair thin" x1="${x[1] - S * .7}" x2="${x[1] + S * .7}" y1="${yTop - S * .3}" y2="${yTop - S * .3}"/>`;
+    if (m.touch === 'tie') return `<path class="tie" d="M${x[0] + S * .3} ${Y(stepOf('A4')) + S * 1}Q${(x[0] + x[1]) / 2} ${Y(stepOf('A4')) + S * 2.4} ${x[1] - S * .3} ${Y(stepOf('A4')) + S * 1}"/>`;
     if (m.touch === 'repeat') { const end = x[x.length - 1]; return `<circle class="n-head" cx="${end - S * 1.0}" cy="${yTop + S * 1.5}" r="${S * .2}"/><circle class="n-head" cx="${end - S * 1.0}" cy="${yTop + S * 2.5}" r="${S * .2}"/>`; }
     return '';
   };
-  const items = m.touch === 'repeat' ? [{ p: 'G4', d: 'q', noStem: false }, { p: 'A4', d: 'q' }, { p: 'B4', d: 'q' }, { bar: 'end' }] : [{ p: 'G4', d: 'q', noStem: true }, { p: 'A4', d: 'q', noStem: true }, { p: 'B4', d: 'q', noStem: true }];
+  const items = m.touch === 'tie' ? [{ p: 'A4', d: 'h', noStem: true }, { p: 'A4', d: 'h', noStem: true }] : m.touch === 'repeat' ? [{ p: 'G4', d: 'q', noStem: false }, { p: 'A4', d: 'q' }, { p: 'B4', d: 'q' }, { bar: 'end' }] : [{ p: 'G4', d: 'q', noStem: true }, { p: 'A4', d: 'q', noStem: true }, { p: 'B4', d: 'q', noStem: true }];
   return staffSvg({ clef: 't', S: 11, width: big ? 280 : 220, items, extra, lo: stepOf('C4') - 2, hi: stepOf('F5') + 3, noClef: false, cl: 'markstaff' });
 }
 function markDemo(s) {
@@ -465,10 +612,22 @@ function markDemo(s) {
     repeat: [...line(.5), ...line(.5)],
     allegro: line(.5, .22), andante: line(.5, .5), adagio: line(.5, 1.2),
     rit: up.map((m, i) => ({ midi: m, beats: .35 + i * .3 })),
+    ff: line(1), pp: line(.08), presto: line(.5, .16), moderato: line(.5, .4), largo: line(.5, 1.6),
+    accel: up.map((m, i) => ({ midi: m, beats: 1.5 - i * .3 })), sfz: [{ midi: 60, beats: .6, vol: .3 }, { midi: 64, beats: .6, vol: 1 }, { midi: 62, beats: .6, vol: .3 }],
+    legato: line(.5, .5, .75), tie: [{ midi: 69, beats: 3 }], tenuto: [{ midi: 60, beats: 1 }, { midi: 62, beats: 1, len: 1 }, { midi: 64, beats: 1 }],
   }[s];
 }
 function markProblem(p, it) {
   p.mode = 'choice';
+  if (it.markBack) {
+    const pool = LEVELS.marks.slice(0, 4).flatMap(l => l.items).map(x => x.mark);
+    const others = shuffle(pool.filter(x => x !== it.markBack)).slice(0, 3);
+    p.prompt = `Which sign means: ${MARKS[it.markBack].means.toLowerCase()}?`;
+    p.layout = 'vis';
+    p.choices = shuffle([it.markBack, ...others]).map(x => ({ ok: x === it.markBack, label: MARKS[x].word, vis: markSvg(x) }));
+    p.answerText = () => `That sign is ${MARKS[it.markBack].word}.`;
+    return;
+  }
   const pool = LEVELS.marks.slice(0, p.level).flatMap(l => l.items).map(x => x.mark);
   const others = shuffle(pool.filter(s => s !== it.mark && MARKS[s].means !== MARKS[it.mark].means)).slice(0, 3);
   p.vis = markSvg(it.mark, true);
@@ -490,6 +649,51 @@ function earProblem(p, it) {
     p.choices = [{ t: 'Step', ok: step }, { t: 'Skip', ok: !step }];
     p.hear = [{ midi: whiteMidi(first), beats: 1 }, { midi: whiteMidi(next), beats: 1 }];
     p.answerText = () => step ? 'Next-door letters: a step.' : 'It jumps over one letter: a skip.';
+  } else if (it.ear === 'same') {
+    const a = pick([['C4', 'E4', 'G4', 'E4'], ['G4', 'F4', 'E4', 'D4'], ['C4', 'D4', 'E4', 'C4'], ['E4', 'G4', 'A4', 'G4']]), same = rng() < .5;
+    const b = a.slice();
+    if (!same) { const i = 1 + Math.floor(rng() * 3); b[i] = pitchOf(stepOf(b[i]) + (rng() < .5 ? 2 : -2)); }
+    p.prompt = 'Were the two tunes the same?';
+    p.layout = 'nums';
+    p.choices = [{ t: 'Same', ok: same }, { t: 'Different', ok: !same }];
+    p.hear = [...a.map(x => ({ midi: midiOf(x), beats: .6 })), { beats: 1.2 }, ...b.map(x => ({ midi: midiOf(x), beats: .6 }))];
+    p.answerText = () => same ? 'They matched, note for note.' : 'One note was different.';
+  } else if (it.ear === 'shape') {
+    const shapes = { 'It climbed': [0, 1, 2, 3, 4], 'It fell': [4, 3, 2, 1, 0], 'Up, then back down': [0, 2, 4, 2, 0], 'Down, then back up': [4, 2, 0, 2, 4] };
+    const right = pick(Object.keys(shapes));
+    p.prompt = 'What shape was the tune?';
+    p.choices = Object.keys(shapes).map(t => ({ t, ok: t === right }));
+    p.hear = shapes[right].map(i => ({ midi: midiOf(CMAJ[i]), beats: .6 }));
+    p.answerText = () => `${right}.`;
+  } else if (it.ear === 'highest') {
+    const at = Math.floor(rng() * 3), low = shuffle(['C4', 'D4', 'E4', 'F4']).slice(0, 2), top = pick(['C5', 'B4', 'A4']), seq = low.slice();
+    seq.splice(at, 0, top);
+    p.prompt = 'Which note was the highest?';
+    p.layout = 'nums';
+    p.choices = ['First', 'Second', 'Third'].map((t, i) => ({ t, ok: i === at }));
+    p.hear = seq.map(x => ({ midi: midiOf(x), beats: 1 }));
+    p.answerText = () => `The ${['first', 'second', 'third'][at]} note was the highest.`;
+  } else if (it.ear === 'chord') {
+    const major = rng() < .5, root = 57 + Math.floor(rng() * 8), notes = [root, root + (major ? 4 : 3), root + 7];
+    p.prompt = 'Was that chord major or minor?';
+    p.layout = 'nums';
+    p.choices = [{ t: 'Major, bright', ok: major }, { t: 'Minor, dark', ok: !major }];
+    p.hear = notes.map((m, i) => ({ midi: m, beats: i === 2 ? 2 : 0, len: 2 }));  // no beats between them: they sound together
+    p.answerText = () => major ? 'That was a major chord.' : 'That was a minor chord.';
+  } else if (it.ear === 'leap') {
+    const kind = pick(['Step', 'Skip', 'Leap']), gap = kind === 'Step' ? 1 : kind === 'Skip' ? 2 : 3 + Math.floor(rng() * 2), i = 2 + Math.floor(rng() * 3);
+    p.prompt = 'Was that a step, a skip or a leap?';
+    p.layout = 'nums';
+    p.choices = ['Step', 'Skip', 'Leap'].map(t => ({ t, ok: t === kind }));
+    p.hear = [{ midi: midiOf(CMAJ[i]), beats: 1 }, { midi: midiOf(CMAJ[i + gap]), beats: 1 }];
+    p.answerText = () => `That was a ${kind.toLowerCase()}.`;
+  } else if (it.ear === 'name') {
+    const l = pick(['D4', 'E4', 'F4', 'G4']);
+    p.prompt = 'You hear Middle C, then which note?';
+    p.layout = 'nums';
+    p.choices = ['D', 'E', 'F', 'G'].map(t => ({ t, ok: t === l[0] }));
+    p.hear = [{ midi: 60, beats: 1.2 }, { midi: midiOf(l), beats: 1.4 }];
+    p.answerText = () => `Up from C to ${l[0]}.`;
   } else if (it.ear === 'high') {
     const a = 55 + Math.floor(rng() * 12), gap = 7 + Math.floor(rng() * 8), first = rng() < .5;
     const [x, y] = first ? [a + gap, a] : [a, a + gap];
@@ -513,6 +717,16 @@ function earProblem(p, it) {
     p.choices = [{ t: 'Step', ok: step }, { t: 'Skip', ok: !step }];
     p.hear = [{ midi: midiOf(x), beats: 1 }, { midi: midiOf(y), beats: 1 }];
     p.answerText = () => step ? 'Next-door notes: a step.' : 'It jumped over a note: a skip.';
+  } else if (it.ear === 'match6' || it.ear === 'matchb') {
+    const bass = it.ear === 'matchb';
+    const bank = bass ? [['C4', 'B3', 'A3', 'G3'], ['G3', 'A3', 'B3', 'C4'], ['C4', 'A3', 'C4', 'A3'], ['A3', 'G3', 'F3', 'G3'], ['C4', 'G3', 'A3', 'F3']]
+      : [['C4', 'D4', 'E4', 'F4', 'E4', 'D4'], ['G4', 'E4', 'C4', 'E4', 'G4', 'E4'], ['C4', 'E4', 'D4', 'F4', 'E4', 'G4'], ['G4', 'F4', 'E4', 'D4', 'C4', 'D4'], ['E4', 'E4', 'F4', 'G4', 'G4', 'F4']];
+    const opts = shuffle(bank).slice(0, 3), right = pick(opts);
+    p.prompt = 'Listen. Which notes did you hear?';
+    p.layout = 'vis';
+    p.hear = right.map(x => ({ midi: midiOf(x), beats: .7 }));
+    p.choices = opts.map(o => ({ ok: o === right, vis: staffSvg({ clef: bass ? 'b' : 't', S: 9, width: 260, lo: stepOf('F3'), hi: stepOf('G4'), items: o.map(x => ({ p: x, d: 'q' })) }) }));
+    p.answerText = () => 'Follow the notes with your finger and listen again.';
   } else {
     const bank = [['C4', 'D4', 'E4', 'G4'], ['G4', 'E4', 'D4', 'C4'], ['C4', 'E4', 'C4', 'E4'], ['E4', 'D4', 'C4', 'D4'], ['C4', 'C4', 'G4', 'G4'], ['G4', 'F4', 'E4', 'D4'], ['C4', 'G4', 'E4', 'C4']];
     const opts = shuffle(bank).slice(0, 3), right = pick(opts);
@@ -535,8 +749,9 @@ const levelNow = k => Math.min(state.levels[k], maxLevel(k));
 // A new thing gets a card of its own before it's asked: the note, where it sits and how to count to it.
 function introFor(it) {
   if (it.note && !it.keyOnly) return { title: midCName(it.p), words: `${describe(it.clef, stepOf(it.p))[0].toUpperCase()}${describe(it.clef, stepOf(it.p)).slice(1)}. ${walkWords(it.clef, stepOf(it.p))}`, kind: 'note' };
-  if (it.dur) return { title: DUR_NAME[it.dur], words: `It lasts ${beatWord(BEATS[it.dur])}.`, vis: smallRhythm([it.dur], { width: 180, S: 15 }), hear: [{ midi: 67, beats: BEATS[it.dur] }] };
-  if (it.rest) return { title: REST_NAME[it.rest], words: `Be silent for ${beatWord(BEATS[it.rest])}.`, vis: smallRhythm(['r' + it.rest], { width: 180, S: 15 }) };
+  if (it.dur) return { title: DUR_NAME[it.dur], words: `It lasts ${beatWord(BEATS[it.dur])}.`, vis: smallRhythm([it.dur], { width: 180, S: 15 }), hear: [{ midi: 67, beats: BEATS[it.dur] }], onBeat: true };
+  if (it.rest) return { title: REST_NAME[it.rest], words: `Be silent for ${beatWord(BEATS[it.rest])}.`, vis: smallRhythm(['r' + it.rest], { width: 180, S: 15 }), hear: [{ beats: BEATS[it.rest] }, { midi: 67, beats: 1 }], onBeat: true };
+  if (it.markBack) return null;
   if (it.mark) return { title: MARKS[it.mark].word, words: `${MARKS[it.mark].means}.`, vis: markSvg(it.mark, true), hear: markDemo(it.mark) };
   return null;
 }
@@ -632,7 +847,7 @@ function startCheck() { audioReady(); if (listenMode()) startMic(); sess = build
 function enterSlide() {
   hush();
   const p = sess.probs[sess.i];
-  if (p.autoHear && p.hear && !p.done) setTimeout(() => playSeq(p.hear), 250);
+  if (p.autoHear && p.hear && !p.done) setTimeout(() => playHear(p.hear, p.onBeat), 250);
   if (state.autoSpeak) say(slideWords(p));
 }
 function slideWords(p) {
@@ -647,7 +862,7 @@ function gotIt(p) {
   tell(p, `${p.praise} ${p.answerText ? p.answerText() : ''}`);
   record(p, p.tries === 0);
   if (hearing()) return;
-  if (p.hear) playSeq(p.hear); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi);
+  if (p.hear) playHear(p.hear, p.onBeat); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi);
 }
 function missed(p, wrongLine) {
   p.tries++;
@@ -658,7 +873,7 @@ function missed(p, wrongLine) {
     tell(p, `${wrongLine} ${p.answerText ? p.answerText() : ''}`);
     record(p, false);
     if (hearing()) return;
-    if (p.hear) playSeq(p.hear); else if (p.hearP) setTimeout(() => playP(p.hearP), 350); else if (p.hearMidi) tone(p.hearMidi);
+    if (p.hear) playHear(p.hear, p.onBeat); else if (p.hearP) setTimeout(() => playP(p.hearP), 350); else if (p.hearMidi) tone(p.hearMidi);
   } else if (state.autoSpeak) say(`${wrongLine} Try again.`);
 }
 function answer(idx) {
@@ -673,10 +888,11 @@ function answer(idx) {
 function tapKey(midi) {
   const p = sess?.probs[sess.i];
   if (p?.mode === 'row') return rowPress(midi);
-  if (!hearing()) tone(midi);
+  const listening = hearing() && !p?.onScreen;
+  if (!listening) tone(midi);
   if (!p || p.done || p.mode !== 'key') return;
-  const ok = p.okMidi ? p.okMidi(midi) : hearing() ? midi % 12 === p.targetMidi % 12 : midi === p.targetMidi;
-  if (ok) { p.chosen = hearing() ? null : midi; gotIt(p); render(); return; }
+  const ok = p.okMidi ? p.okMidi(midi) : listening ? midi % 12 === p.targetMidi % 12 : midi === p.targetMidi;
+  if (ok) { p.chosen = listening ? null : midi; gotIt(p); render(); return; }
   if (p.wrongKeys?.includes(midi)) return;
   (p.wrongKeys = p.wrongKeys || []).push(midi);
   let line = `That’s ${isBlack(midi) ? 'a black key: ' + keyName(midi) : keyName(midi)}.`;
@@ -851,7 +1067,9 @@ function finishSong() {
 function hearSong() {
   if (song.playing >= 0) { hush(); song.playing = -1; render(); return; }
   const list = song.flat.map(x => ({ midi: midiOf(x.p), beats: BEATS[x.d] }));
-  playSeq(list, 110, i => { if (screen !== 'song') return; song.playing = i; render(); });
+  song.playing = 0;
+  render();
+  playSeq(list, 90, i => { if (screen !== 'song') return; song.playing = i; render(); }, { perBar: song.s.time[0] });
 }
 
 /* ---------- rendering ---------- */
@@ -937,6 +1155,7 @@ function rowButtons(p) {
 }
 function pianoFor(p) {
   const marks = {};
+  if (p.litMidi != null) marks[p.litMidi] = 'hl';
   for (const m of p.wrongKeys || []) marks[m] = 'no';
   if (p.done) {
     if (p.chosen != null) marks[p.chosen] = 'ok';
@@ -975,10 +1194,13 @@ function chapterShow(c) {
     return `<div class="pair">${staffSvg({ clef: 't', S: 12, width: 170, lo: pairLo, items: [{ p: s.pair[0], d: 'w' }] })}${staffSvg({ clef: 'b', S: 12, width: 170, hi: pairHi, items: [{ p: s.pair[1], d: 'w' }] })}</div>`;
   }
   if (s.clef) return labelled(s.clef, s.p);
+  if (s.sig) return sigStaff(s.sig);
+  if (s.tied) return tiedNotes(s.rhythm[0], s.rhythm[1]);
   if (s.rhythm) return smallRhythm(s.rhythm, { width: 320, S: 14 });
   if (s.bar) return smallRhythm([...s.bar, '|'], { width: 340, S: 13, time: s.time });
   if (s.accs) return `<div class="pair">${['G#4', 'Bb4'].map(x => staffSvg({ clef: 't', S: 12, width: 170, items: [{ p: x, acc: parseP(x).acc }] })).join('')}</div>`;
   if (s.marks) return `<div class="mark-row">${s.marks.map(m => `<div class="mark-cell">${markSvg(m)}<small>${esc(MARKS[m].word)}</small></div>`).join('')}</div>`;
+  if (s.demo) return pianoSvg({ ...s.demo, from: stepOf(s.demo.from), letters: s.demo.letters === 'lit' ? 'c' : s.demo.letters });
   if (s.keys) {
     const from = stepOf('C4'), hl = s.keys === 'CDE' ? ['C', 'D', 'E'] : s.keys === 'FGAB' ? ['F', 'G', 'A', 'B'] : [];
     const marks = {};
@@ -1019,9 +1241,9 @@ function renderPlay() {
     body = promptRow(p.prompt) + `<div class="staff-wrap">${placeStaff(p)}</div>`;
     controls = p.done ? '' : `<div class="next-row"><button class="start" data-act="check-place" ${p.sel == null ? 'disabled' : ''}>That’s it</button></div><p class="note center">Tap or drag on the staff to move the note.</p>`;
   } else if (p.mode === 'key') {
-    const staff = p.item.note ? `<div class="staff-wrap small">${noteStaff(p, 20)}</div>` : '';
+    const staff = p.item.note ? `<div class="staff-wrap small">${noteStaff(p, 20)}</div>` : p.vis ? `<div class="staff-wrap small">${p.vis}</div>` : '';
     // when listening, the real piano replaces the one on screen
-    body = hearing() && !p.done
+    body = hearing() && !p.done && !p.onScreen
       ? promptRow(p.prompt.replace(/^(Tap|Find this note on the piano\.)/, m => m === 'Tap' ? 'Play' : 'Play this note on your piano.')) + staff + listenPanel('Listening.')
       : promptRow(p.prompt) + staff + micProblem() + pianoFor(p);
   } else if (p.mode === 'real') {
@@ -1187,8 +1409,8 @@ const ACTIONS = {
   'row-hear'() { playRow(sess.probs[sess.i]); },
   pick(d) { answer(+d.i); },
   say() { const p = sess?.probs[sess.i]; if (p) say(slideWords(p)); },
-  replay() { const p = sess.probs[sess.i]; if (p.hear) playSeq(p.hear); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi); },
-  'hear-intro'() { const p = sess.probs[sess.i]; if (p.intro.hear) playSeq(p.intro.hear); else if (p.item.note) playP(p.item.p); else if (p.item.rest) say('Silence.'); },
+  replay() { const p = sess.probs[sess.i]; if (p.hear) playHear(p.hear, p.onBeat); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi); },
+  'hear-intro'() { const p = sess.probs[sess.i]; if (p.intro.hear) playHear(p.intro.hear, p.intro.onBeat); else if (p.item.note) playP(p.item.p); },
   'check-place'() { checkPlaced(); },
   'real-hear'() { const p = sess.probs[sess.i]; p.heard = true; playP(p.p); render(); },
   'said-yes'() { selfCheck(true); },

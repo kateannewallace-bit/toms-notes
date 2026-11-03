@@ -65,7 +65,7 @@ function hintWords(c, s) {
 }
 
 /* ---------- drawing the staff ---------- */
-const BEATS = { w: 4, 'h.': 3, h: 2, 'q.': 1.5, q: 1, e: 0.5 };
+const BEATS = { w: 4, 'h.': 3, h: 2, 'q.': 1.5, q: 1, e: 0.5, s: 0.25 };
 const glyph = (name, x, yBase, S, cls = '', flip = false) => {
   const k = S / 250;
   return `<path class="gl ${cls}" transform="translate(${x.toFixed(1)} ${yBase.toFixed(1)}) scale(${k.toFixed(4)} ${(flip ? k : -k).toFixed(4)})" d="${GLYPHS[name].d}"/>`;
@@ -94,6 +94,7 @@ function drawNote(c, x, s, d, S, Y, o = {}) {
     if (o.stemTo != null) end = o.stemTo;
     out += `<line class="n-stem ${cls}" x1="${sx}" x2="${sx}" y1="${y}" y2="${end}" stroke-width="${S * .1}"/>`;
     stem = { x: sx, end, up };
+    if (base === 's') for (const shift of [0, up ? S * .8 : -S * .8]) out += glyph('flag', sx - S * .06, (up ? end + (1009 / 250) * S : end - (1009 / 250) * S) + shift, S, cls, !up);
     if (base === 'e' && !o.beamed) out += glyph('flag', sx - S * .06, up ? end + (1009 / 250) * S : end - (1009 / 250) * S, S, cls, !up);
   }
   if (d && d.endsWith('.')) out += `<circle class="n-head ${cls}" cx="${x + S * 1.05}" cy="${(s - bottom) % 2 === 0 ? y - S / 2 : y}" r="${S * .17}"/>`;
@@ -239,16 +240,31 @@ function tone(midi, when = 0, dur = 0.9, vol = 0.6) {
 function hush() { for (const n of liveNodes) { try { n.stop(); } catch (e) {} } liveNodes = []; clearSeqTimers(); }
 let seqTimers = [];
 const clearSeqTimers = () => { seqTimers.forEach(clearTimeout); seqTimers = []; };
+// One metronome tick. The first beat of each bar is higher, so the bar can be felt.
+function click(when = 0, accent = false) {
+  const a = audioReady();
+  if (!a) return;
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + .3) * 1000);
+  const t0 = a.currentTime + when + 0.01, os = a.createOscillator(), g = a.createGain();
+  os.type = 'square'; os.frequency.value = accent ? 1760 : 1175;
+  g.gain.setValueAtTime(accent ? .22 : .14, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + .04);
+  os.connect(g); g.connect(masterGain);
+  os.start(t0); os.stop(t0 + .05);
+  liveNodes.push(os);
+}
 // Plays [{ midi, beats, vol }]; rests have no midi. onNote(i) fires as each one sounds.
-function playSeq(list, bpm = 96, onNote) {
+// With metro, a metronome counts in for a bar and keeps ticking under the music, so lengths can be heard against the beat.
+function playSeq(list, bpm = 96, onNote, metro) {
   hush();
-  const beat = 60 / bpm;
-  let t = 0;
+  const beat = 60 / bpm, perBar = metro?.perBar || 4, lead = metro ? perBar * beat : 0;
+  let t = lead;
   list.forEach((n, i) => {
     if (n.midi != null) tone(n.midi, t, n.len ?? n.beats * beat * .92, n.vol ?? .6);
     if (onNote) seqTimers.push(setTimeout(() => onNote(i), t * 1000));
     t += n.beats * beat;
   });
+  if (metro) for (let b = 0; b * beat < t - .001; b++) click(b * beat, b % perBar === 0);
   if (onNote) seqTimers.push(setTimeout(() => onNote(-1), t * 1000));
   return t;
 }
