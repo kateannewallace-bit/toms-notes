@@ -183,6 +183,8 @@ function micNote(midi) {
   if (p.mode === 'row') rowPress(keyName(midi));
   else if (p.mode === 'key' && !p.onScreen) tapKey(midi);
 }
+// An iPad can play sound very quietly while its microphone is on, so "hear it" buttons switch it off first. The next slide turns it back on.
+function freeSpeaker() { if (mic.status === 'on') stopMic(); }
 mic.onNote = midi => micNote(midi);
 mic.onStatus = () => { if (screen === 'play' || screen === 'song' || screen === 'parent') render(); };
 mic.onFrame = t => {
@@ -536,7 +538,7 @@ function accidentalProblem(p, it) {
     const k = it.ksPlay, changed = KEY_SIGS[k][0], letter = changed[0], s = stepOf(letter + '4');
     p.mode = 'key'; p.whites = 11; p.from = s - 5;
     p.pianoOpts = { letters: 'c', star: true };
-    p.vis = sigStaff(k, [{ p: letter + '4', d: 'q' }]);
+    p.vis = sigStaff(k, [{ p: letter + '4', d: 'q', sound: changed + '4' }]);
     p.targetMidi = midiOf(changed + '4');
     p.prompt = `In the key of ${keyWord(k)}, find this note.`;
     p.answerText = () => `In the key of ${keyWord(k)}, every ${letter} is played as ${prettySym(changed + '4')}.`;
@@ -846,6 +848,7 @@ function startCheck() { audioReady(); if (listenMode()) startMic(); sess = build
 /* ---------- answering ---------- */
 function enterSlide() {
   hush();
+  if (listenMode() && mic.status === 'off') startMic();
   const p = sess.probs[sess.i];
   if (p.autoHear && p.hear && !p.done) setTimeout(() => playHear(p.hear, p.onBeat), 250);
   if (state.autoSpeak) say(slideWords(p));
@@ -882,6 +885,8 @@ function answer(idx) {
   const c = p.choices[idx];
   if (c.ok) { gotIt(p); render(); return; }
   p.wrong.push(idx);
+  const ref = p.hearMidi ?? (p.hearP ? midiOf(p.hearP) : null);
+  if (p.layout === 'letters' && ref != null && !hearing()) tone(nearestLetter(c.t, ref));
   missed(p, p.layout === 'letters' ? `Not ${c.t}.` : 'Not that one.');
   render(!p.done);
 }
@@ -928,6 +933,7 @@ function rowPress(v) {
   }
   n.tries++;
   p.misses++;
+  if (!p.rowKeys && !hearing() && n.tries < 2 && LETTERS.includes(v)) tone(nearestLetter(v, whiteMidi(n.step)));
   const named = p.rowKeys ? keyName(v) : v;
   if (n.tries >= 2) {
     if (!hearing()) tone(whiteMidi(n.step));
@@ -966,7 +972,14 @@ function noteDone(p, n, first) {
   }
   save();
 }
-const playRow = p => playSeq(p.notes.map(n => ({ midi: whiteMidi(n.step), beats: 1 })), 100);
+// Each note lights up as it sounds, so the row can be followed by eye.
+function playRow(p) {
+  playSeq(p.notes.map(n => ({ midi: whiteMidi(n.step), beats: 1 })), 100, i => {
+    if (sess?.probs[sess.i] !== p) return;
+    p.playAt = i;
+    render();
+  });
+}
 function record(p, first) {
   sess.results.push(first);
   p.result = first;
@@ -1136,7 +1149,7 @@ function placeStaff(p) {
 }
 function rowStaff(p) {
   const size = p.notes.length, S = 24, width = size === 8 ? 620 : 520;
-  const cls = (n, i) => n.state === 'ok' ? 'ok' : n.state === 'late' ? 'late' : n.state === 'shown' ? 'try' : i === p.at && !p.done ? 'now' : '';
+  const cls = (n, i) => p.playAt === i ? 'now' : n.state === 'ok' ? 'ok' : n.state === 'late' ? 'late' : n.state === 'shown' ? 'try' : i === p.at && !p.done ? 'now' : '';
   const low = Math.min(CLEF[p.clef].bottom, ...p.notes.map(n => n.step));
   const extra = ({ x, Y }) => {
     const labels = p.notes.map((n, i) => n.state ? `<text class="row-l ${cls(n, i)}" x="${x[i]}" y="${Y(low) + S * 2}" font-size="${S * .95}">${letterOf(n.step)}</text>` : '');
@@ -1235,7 +1248,7 @@ function renderPlay() {
   if (p.mode === 'row') {
     return `${head}<div class="problem" id="problem">${promptRow(p.prompt)}<div class="staff-wrap row-wrap">${rowStaff(p)}</div></div>${rowButtons(p)}
     <div class="feedback">${p.done ? `<span class="big ${p.misses ? 'try' : 'good'}">${esc(p.praise)}</span>${p.lastWrong ? `<span class="how">${esc(p.lastWrong)}</span>` : ''}` : p.lastWrong ? `<span class="how try-line">${esc(p.lastWrong)}</span>` : ''}</div>
-    ${p.done ? `<div class="next-row"><button class="ghost" data-act="row-hear">♪ Hear the row</button><button class="start" data-act="next" id="next">${last ? 'My stars' : 'Next'}</button></div>` : ''}${foot}`;
+    ${p.done ? `<div class="next-row"><button class="ghost" data-act="row-hear">${p.playAt >= 0 ? '♪ Playing…' : '♪ Hear the row'}</button><button class="start" data-act="next" id="next">${last ? 'My stars' : 'Next'}</button></div>` : ''}${foot}`;
   }
   if (p.mode === 'place') {
     body = promptRow(p.prompt) + `<div class="staff-wrap">${placeStaff(p)}</div>`;
@@ -1366,7 +1379,7 @@ function renderParent() {
     <div class="row-btns">${confirmWipe ? `<button class="ghost danger" data-act="wipe-yes">Yes, erase all progress</button><button class="link" data-act="wipe-no">Cancel</button>` : `<button class="ghost danger" data-act="wipe">Reset all progress</button>`}</div>
   </section>
   ${renderSync()}
-  <p class="note">Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
+  <p class="note">Piano sound: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano V3</a> by Alexander Holm, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, converted to shorter MP3 files. Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
 }
 function renderSync() {
   if (!syncAvailable) return '<p class="note">Progress is saved on this device.</p>';
@@ -1406,10 +1419,10 @@ const ACTIONS = {
   check() { startCheck(); window.scrollTo?.({ top: 0 }); },
   next() { next(); },
   'row-letter'(d) { rowPress(d.l); },
-  'row-hear'() { playRow(sess.probs[sess.i]); },
+  'row-hear'() { freeSpeaker(); playRow(sess.probs[sess.i]); },
   pick(d) { answer(+d.i); },
   say() { const p = sess?.probs[sess.i]; if (p) say(slideWords(p)); },
-  replay() { const p = sess.probs[sess.i]; if (p.hear) playHear(p.hear, p.onBeat); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi); },
+  replay() { const p = sess.probs[sess.i]; if (p.done) freeSpeaker(); if (p.hear) playHear(p.hear, p.onBeat); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi); },
   'hear-intro'() { const p = sess.probs[sess.i]; if (p.intro.hear) playHear(p.intro.hear, p.intro.onBeat); else if (p.item.note) playP(p.item.p); },
   'check-place'() { checkPlaced(); },
   'real-hear'() { const p = sess.probs[sess.i]; p.heard = true; playP(p.p); render(); },
@@ -1451,6 +1464,9 @@ app.addEventListener('click', e => {
     return;
   }
   const b = e.target.closest?.('[data-act]');
+  // a note on a staff plays when tapped, unless the whole staff is itself an answer button
+  const note = !b && e.target.closest?.('[data-play]');
+  if (note) { audioReady(); playP(note.dataset.play, 1.2); return; }
   if (!b || b.disabled) return;
   audioReady();
   ACTIONS[b.dataset.act]?.(b.dataset);

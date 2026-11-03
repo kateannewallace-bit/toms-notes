@@ -36,7 +36,7 @@ const midiFromFreq = f => Math.round(69 + 12 * Math.log2(f / 440));
 // feed() takes one frame and returns a MIDI note number the moment a new note is sure, else null.
 // A note must hold steady for a few frames, and a ringing note can't fire twice: it takes a fresh attack or silence.
 class NoteTracker {
-  constructor() { this.candidate = null; this.count = 0; this.armed = true; this.last = null; this.floor = 0.002; this.smooth = 0; this.current = null; this.level = 0; this.sinceAttack = 99; this.prev = 0; }
+  constructor() { this.candidate = null; this.count = 0; this.armed = true; this.last = null; this.floor = 0.002; this.smooth = 0; this.current = null; this.level = 0; this.sinceAttack = 99; this.prev = 0; this.peak = 0; }
   feed(samples, sampleRate) {
     let e = 0;
     for (let i = 0; i < samples.length; i++) e += samples[i] * samples[i];
@@ -53,7 +53,7 @@ class NoteTracker {
     const attack = rising && this.sinceAttack >= 4 && rms > this.smooth * 1.3 && rms > Math.max(0.002, this.floor * 3);
     if (attack) this.sinceAttack = 0;
     this.smooth = this.smooth * 0.7 + rms * 0.3;
-    if (!loud) { this.candidate = null; this.count = 0; this.armed = true; this.current = null; return null; }
+    if (!loud) { this.candidate = null; this.count = 0; this.armed = true; this.current = null; this.peak = 0; return null; }
     if (attack) this.armed = true;
     const pitch = detectPitch(samples, sampleRate);
     if (!pitch) { this.count = 0; return null; }
@@ -61,9 +61,12 @@ class NoteTracker {
     if (midi === this.candidate) this.count++; else { this.candidate = midi; this.count = 1; }
     this.current = midi;
     const newName = this.last == null || midi % 12 !== this.last % 12;
+    this.peak = Math.max(this.peak, rms);
+    // a ringing piano note swells and fades as it dies away; striking the same key again has to come back near its full strength
+    if (!newName && rms < this.peak * .7) { this.armed = false; return null; }
     // a clearly different note counts even without a sharp attack; the same one needs a fresh strike
     if ((this.armed && this.count >= 3) || (newName && this.count >= 5)) {
-      this.armed = false; this.last = midi; this.count = 0;
+      this.armed = false; this.last = midi; this.count = 0; this.peak = rms;
       return midi;
     }
     return null;

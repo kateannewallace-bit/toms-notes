@@ -300,3 +300,7 @@ svg.staff { max-height: 52vh; }
 .mic-bar i { display: block; height: 100%; width: 0; background: #111; }
 
 .tie { fill: none; stroke: #111; stroke-width: 1.6; stroke-linecap: round; }
+
+/* notes play when tapped */
+.note-hit { fill: transparent; }
+.tap-note { cursor: pointer; }

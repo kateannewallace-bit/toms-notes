@@ -12,6 +12,8 @@ const pitchOf = step => letterOf(step) + Math.floor(step / 7);
 const BLACK_NAME = { 1: 'C♯ or D♭', 3: 'D♯ or E♭', 6: 'F♯ or G♭', 8: 'G♯ or A♭', 10: 'A♯ or B♭' };
 const isBlack = midi => !!BLACK_NAME[midi % 12];
 const keyName = midi => isBlack(midi) ? BLACK_NAME[midi % 12] : LETTERS[SEMIS.indexOf(midi % 12)];
+// The white key with this letter closest to a given key.
+const nearestLetter = (letter, midi) => { const pc = SEMIS[LETTERS.indexOf(letter)], up = ((pc - midi % 12) + 12) % 12; return up <= 6 ? midi + up : midi + up - 12; };
 const whiteMidi = step => 12 * (Math.floor(step / 7) + 1) + SEMIS[((step % 7) + 7) % 7];
 const MIDDLE_C = 60;
 const withA = l => `${'AEF'.includes(l) ? 'an' : 'a'} ${l}`;
@@ -65,6 +67,8 @@ function hintWords(c, s) {
 }
 
 /* ---------- drawing the staff ---------- */
+// The font draws its bass clef low: its dots center at 644 units, and they must straddle the F line at 750.
+const BASS_CLEF_RAISE = (750 - 644) / 250;
 const BEATS = { w: 4, 'h.': 3, h: 2, 'q.': 1.5, q: 1, e: 0.5, s: 0.25 };
 const glyph = (name, x, yBase, S, cls = '', flip = false) => {
   const k = S / 250;
@@ -100,6 +104,8 @@ function drawNote(c, x, s, d, S, Y, o = {}) {
   if (d && d.endsWith('.')) out += `<circle class="n-head ${cls}" cx="${x + S * 1.05}" cy="${(s - bottom) % 2 === 0 ? y - S / 2 : y}" r="${S * .17}"/>`;
   return { svg: out, stem };
 }
+// A note you can tap to hear. it.sound overrides the written pitch, for a note changed by a key signature.
+const tapNote = (svg, it, x, y, S) => `<g class="tap-note" data-play="${it.sound || it.p}"><rect class="note-hit" x="${x - S * 1.1}" y="${y - S * 1.1}" width="${S * 2.2}" height="${S * 2.2}"/>${svg}</g>`;
 function drawRest(d, x, S, Y, c, cls = '') {
   const bottom = CLEF[c].bottom, midY = Y(bottom + 4), line4 = Y(bottom + 6);
   if (d === 'w') return `<rect class="n-head ${cls}" x="${x - S * .6}" y="${line4}" width="${S * 1.2}" height="${S * .5}"/>`;
@@ -122,7 +128,7 @@ function staffSvg(o) {
   const timeW = o.time ? S * 2.4 : 0;
   let out = '';
   for (let i = 0; i < 5; i++) out += `<line class="st-line" x1="4" x2="${w - 4}" y1="${yTop + i * S}" y2="${yTop + i * S}"/>`;
-  if (!o.noClef) out += c === 't' ? glyph('treble', 8, Y(bottom), S, 'clef') : glyph('bass', 8, Y(bottom), S, 'clef');
+  if (!o.noClef) out += c === 't' ? glyph('treble', 8, Y(bottom), S, 'clef') : glyph('bass', 8, Y(bottom) - S * BASS_CLEF_RAISE, S, 'clef');
   if (o.time) out += `<text class="timesig" x="${clefW + S}" y="${yTop + S * 1.86}" font-size="${S * 2.3}">${o.time[0]}</text><text class="timesig" x="${clefW + S}" y="${yTop + S * 3.86}" font-size="${S * 2.3}">${o.time[1]}</text>`;
   const items = o.items || [], x0 = clefW + timeW + S * 1.2, room = w - x0 - S * 1.4;
   const weight = i => i.bar ? .35 : Math.max(.85, Math.sqrt(BEATS[i.d || i.r || i.gap || 'q'] || 1));
@@ -147,8 +153,8 @@ function staffSvg(o) {
       const end = up ? Math.min(Y(si), Y(sj)) - S * 3.2 : Math.max(Y(si), Y(sj)) + S * 3.2;
       const a = drawNote(c, at, si, 'e', S, Y, { cls: it.cls, up, stemTo: end, beamed: true, acc: it.acc });
       const b = drawNote(c, placed[j], sj, 'e', S, Y, { cls: items[j].cls, up, stemTo: end, beamed: true, acc: items[j].acc });
-      out += a.svg + b.svg + `<rect class="n-head" x="${Math.min(a.stem.x, b.stem.x) - S * .07}" y="${up ? end : end - S * .45}" width="${Math.abs(b.stem.x - a.stem.x) + S * .14}" height="${S * .45}"/>`;
-    } else if (!pairs.has(i)) out += drawNote(c, at, stepOf(it.p), it.d, S, Y, { cls: it.cls, acc: it.acc, noStem: it.noStem }).svg;
+      out += tapNote(a.svg, it, at, Y(si), S) + tapNote(b.svg, items[j], placed[j], Y(sj), S) + `<rect class="n-head" x="${Math.min(a.stem.x, b.stem.x) - S * .07}" y="${up ? end : end - S * .45}" width="${Math.abs(b.stem.x - a.stem.x) + S * .14}" height="${S * .45}"/>`;
+    } else if (!pairs.has(i)) out += tapNote(drawNote(c, at, stepOf(it.p), it.d, S, Y, { cls: it.cls, acc: it.acc, noStem: it.noStem }).svg, it, at, Y(stepOf(it.p)), S);
   });
   // the walk: letters climbing from the landmark to the note; hint mode hides the last one
   if (o.walk) {
@@ -201,7 +207,45 @@ function starPath(cx, cy, r) {
 // reading the letter is enough to find it, with exactly one right key.
 function pianoWindow(step, r = Math.random) { return step - (4 + Math.floor(r() * 3)); }
 
-/* ---------- sound: a small plucked-string piano ---------- */
+/* ---------- sound: recordings of a real grand piano ---------- */
+// Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0): one recording every three notes, shifted a little for the notes between.
+const PIANO_FILES = { 33: 'A1', 36: 'C2', 39: 'Ds2', 42: 'Fs2', 45: 'A2', 48: 'C3', 51: 'Ds3', 54: 'Fs3', 57: 'A3', 60: 'C4', 63: 'Ds4', 66: 'Fs4', 69: 'A4', 72: 'C5', 75: 'Ds5', 78: 'Fs5', 81: 'A5', 84: 'C6', 87: 'Ds6', 90: 'Fs6', 93: 'A6' };
+// Each recording's measured distance from standard tuning (A = 440), in hundredths of a semitone. Playback corrects it, so every note is in tune with the others.
+const PIANO_CENTS = { 33: 2, 36: 2.8, 39: 3.8, 42: 0.2, 45: 1.8, 48: -2.3, 51: 0.2, 54: 0.7, 57: 4.9, 60: 2.1, 63: 6.5, 66: 0.2, 69: 6.1, 72: 6.2, 75: 5.4, 78: 5.5, 81: 8.6, 84: 12.1, 87: 13, 90: 16.9, 93: 14.6 };
+// How loud a played note's first moments should be at full volume, before the master volume.
+const PIANO_PEAK = 0.24;
+const pianoSamples = {};
+let pianoStarted = false;
+function loadPiano(a) {
+  if (pianoStarted) return;
+  pianoStarted = true;
+  // the notes around Middle C load first, so they're ready soonest
+  const order = Object.keys(PIANO_FILES).map(Number).sort((x, y) => Math.abs(x - 60) - Math.abs(y - 60));
+  (async () => {
+    for (const midi of order) {
+      try {
+        const data = await (await fetch(`piano/${PIANO_FILES[midi]}.mp3`)).arrayBuffer();
+        const buffer = await new Promise((ok, no) => a.decodeAudioData(data, ok, no));
+        // MP3s begin with a sliver of silence; skipping it keeps notes on the beat
+        const ch = buffer.getChannelData(0);
+        let start = 0;
+        while (start < ch.length && Math.abs(ch[start]) < 0.003) start++;
+        // the recordings vary in loudness, so each is scaled by how loud its first moments are, across both channels
+        const other = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : ch;
+        let power = 0, end = Math.min(ch.length, start + Math.floor(buffer.sampleRate * .25));
+        for (let i = start; i < end; i++) { const v = (ch[i] + other[i]) / 2; power += v * v; }
+        const peak = Math.max(.005, Math.sqrt(power / Math.max(1, end - start)));
+        pianoSamples[midi] = { buffer, offset: start / buffer.sampleRate, gain: PIANO_PEAK / peak, cents: PIANO_CENTS[midi] || 0 };
+      } catch (e) {}  // a note without its recording uses the backup tone
+    }
+  })();
+}
+// The closest recording, if it's loaded and near enough to sound natural.
+function nearestSample(midi) {
+  const base = midi - ((midi % 3) === 0 ? 0 : (midi % 3) === 1 ? 1 : -1);
+  return pianoSamples[base] ? { sample: pianoSamples[base], shift: midi - base } : null;
+}
+
 let actx = null, masterGain = null, liveNodes = [];
 let soundingUntil = 0;  // when the app's own sound has died away, so the microphone can ignore it
 function audioReady() {
@@ -210,14 +254,31 @@ function audioReady() {
     if (!AC) return null;
     actx = new AC();
     masterGain = actx.createGain(); masterGain.gain.value = 0.7; masterGain.connect(actx.destination);
+    loadPiano(actx);
   }
-  if (actx.state === 'suspended') actx.resume();
+  // an iPad can leave sound 'interrupted', not just suspended, after the microphone starts
+  if (actx.state !== 'running') actx.resume();
   return actx;
 }
 function tone(midi, when = 0, dur = 0.9, vol = 0.6) {
   const a = audioReady();
   if (!a) return;
   soundingUntil = Math.max(soundingUntil, performance.now() + (when + Math.max(.2, dur) + .45) * 1000);
+  const found = nearestSample(midi);
+  if (found) {
+    const t0 = a.currentTime + when + 0.01, ring = Math.max(.2, dur), src = a.createBufferSource(), env = a.createGain();
+    src.buffer = found.sample.buffer;
+    src.playbackRate.value = Math.pow(2, (found.shift - found.sample.cents / 100) / 12);
+    env.gain.setValueAtTime(vol * found.sample.gain, t0);
+    env.gain.setValueAtTime(vol * found.sample.gain, t0 + ring);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + ring + .25);  // like lifting a finger off the key
+    src.connect(env); env.connect(masterGain);
+    src.start(t0, found.sample.offset);
+    src.stop(t0 + ring + .3);
+    liveNodes.push(src);
+    return;
+  }
+  // the backup tone, for the moment before the recordings have loaded
   const t0 = a.currentTime + when + 0.01, f = 440 * Math.pow(2, (midi - 69) / 12);
   const env = a.createGain(), lp = a.createBiquadFilter();
   lp.type = 'lowpass'; lp.frequency.value = Math.min(9000, f * 7 + 500);

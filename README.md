@@ -9,3 +9,5 @@ A PWA that teaches reading music in black-on-white engraved notation, built from
 - `tools/make_icon.py`: draws the icons.
 
 Bump `VERSION` in `sw.js` on every change. Sync uses the Chalkboard's Supabase functions with the `toms-notes:` prefix.
+
+Piano sound: Salamander Grand Piano V3 by Alexander Holm (https://archive.org/details/SalamanderGrandPianoV3), CC BY 3.0, as the MP3 files published with Tone.js. A synthesized tone is the backup until they load.
