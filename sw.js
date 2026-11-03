@@ -1,7 +1,7 @@
 // Offline support. Bump VERSION whenever app files change so devices pick up the update.
-const VERSION = 'notes-v7';
+const VERSION = 'notes-v8';
 const SHELL = [
-  './', 'index.html', 'styles.css', 'glyphs.js', 'music.js', 'content.js', 'app.js', 'config.js', 'manifest.webmanifest',
+  './', 'index.html', 'styles.css', 'glyphs.js', 'music.js', 'listen.js', 'content.js', 'app.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

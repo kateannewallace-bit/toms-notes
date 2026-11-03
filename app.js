@@ -34,7 +34,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { path: true, reading: true },
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters', speed: 'normal', updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -63,6 +63,7 @@ const syncAvailable = !!(CFG.supabaseUrl && CFG.supabaseKey && window.crypto?.su
 function loadLocal() { try { const t = localStorage.getItem(LS_KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
 function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
 let state = normalize(loadLocal());
+let micTest = false, micLog = [];
 let screen = 'home', sess = null, lastChanges = [], song = null, confirmWipe = false, confirmTopic = null;
 const sync = { code: '', key: '', status: 'off', lastAt: 0, saving: false, dirty: false, error: '' };
 try { sync.code = localStorage.getItem(CODE_KEY) || ''; } catch (e) {}
@@ -159,6 +160,36 @@ const isKnown = wid => { const w = rec(wid); return !!w && (!!w.k || (w.r || 0) 
 const isSeen = wid => !!rec(wid);
 const knownNotes = () => new Set(ORDER.flatMap(k => allItems(k)).filter(i => i.note && !i.keyOnly && isKnown(i.wid)).map(i => `${i.clef}:${i.p}`));
 
+/* ---------- listening to the real piano ---------- */
+const listenMode = () => state.answerWith === 'listen';
+const hearing = () => listenMode() && mic.status === 'on';
+// The microphone reports a note. It only names the letter for sure: pianos fool pitch detection about the octave, so any octave counts.
+function micNote(midi) {
+  if (micTest && screen === 'parent') {
+    micLog = [`${keyName(midi)}, MIDI ${midi}`, ...micLog].slice(0, 8);
+    const ul = document.getElementById('mic-log');
+    if (ul) ul.innerHTML = micLog.map(x => `<li><span>${esc(x)}</span></li>`).join('');
+    return;
+  }
+  if (screen === 'song' && song) return songTap(midi);
+  if (screen !== 'play' || !sess) return;
+  const p = sess.probs[sess.i];
+  if (p.mode === 'row') rowPress(keyName(midi));
+  else if (p.mode === 'key') tapKey(midi);
+}
+mic.onNote = midi => micNote(midi);
+mic.onStatus = () => { if (screen === 'play' || screen === 'song' || screen === 'parent') render(); };
+mic.onFrame = t => {
+  const bar = document.getElementById('mic-level');
+  if (bar) bar.style.width = `${Math.min(100, Math.round(Math.sqrt(t.level) * 220))}%`;
+  const heard = document.getElementById('heard');
+  if (heard) heard.textContent = t.current != null ? `Hearing ${keyName(t.current)}` : '';
+  const exact = document.getElementById('heard-exact');
+  if (exact && t.current != null) exact.textContent = `${keyName(t.current)}, ${t.current === MIDDLE_C ? 'Middle C' : `${t.current > MIDDLE_C ? 'above' : 'below'} Middle C`} (MIDI ${t.current})`;
+};
+const listenPanel = text => `<div class="listen-panel"><span class="listen-dot"></span><span class="listen-text">${esc(text)}</span><strong id="heard" class="heard"></strong><span class="mic-bar"><i id="mic-level"></i></span></div>`;
+const micProblem = () => !listenMode() || mic.status === 'on' ? '' : `<p class="note center">${mic.status === 'asking' ? 'Asking to use the microphone…' : mic.status === 'denied' ? 'The microphone is blocked, so use the buttons for now. A grown-up can allow it in Settings.' : 'This device can’t listen right now, so use the buttons for now.'}</p>`;
+
 /* ---------- making problems ---------- */
 // Every problem: { mode, prompt, choices[{ t | vis, ok }], layout, ... }. There is always exactly one defensible answer.
 const LETTER_CHOICES = () => 'ABCDEFG'.split('');
@@ -206,9 +237,9 @@ function noteProblem(p, it, k) {
   if (mode === 'row' && buildRow(p, it, k)) return;
   if (mode === 'row') mode = LEVELS[k].slice(0, p.level).some(l => l.items.some(i => i.note && parseP(i.p).letter !== p.letter)) ? 'letters' : pick(['place', 'key']);
   // the grown-ups' setting: answer with piano keys instead of letter buttons
-  if (mode === 'letters' && state.answerWith === 'piano' && p.kind !== 'check') mode = 'key';
+  if (mode === 'letters' && state.answerWith !== 'letters' && p.kind !== 'check') mode = 'key';
   if (mode === 'key') {
-    p.mode = state.realPiano ? 'real' : 'key';
+    p.mode = state.realPiano && !listenMode() ? 'real' : 'key';
     delete p.lo; delete p.hi;
     p.prompt = p.mode === 'real' ? 'Find this note on your piano and play it.' : 'Find this note on the piano.';
     p.targetMidi = midiOf(it.p);
@@ -570,7 +601,7 @@ function buildSession() {
   });
   return { probs: [...slides, ...out], i: 0, results: [], cleared: 0, learned: [] };
 }
-function startSession() { audioReady(); sess = buildSession(); screen = 'play'; render(); enterSlide(); }
+function startSession() { audioReady(); if (listenMode()) startMic(); sess = buildSession(); screen = 'play'; render(); enterSlide(); }
 
 /* Quick check: placement. Two notes from each early level, one try each. A level with no misses is marked known, up to the first miss. */
 const CHECK_LEVELS = { path: [0, 1, 2, 3, 4, 5, 6, 7, 8] };
@@ -595,7 +626,7 @@ function finishCheck() {
     state.levels[k] = Math.min(lv + 1, maxLevel(k));
   }
 }
-function startCheck() { audioReady(); sess = buildCheck(); screen = 'play'; render(); enterSlide(); }
+function startCheck() { audioReady(); if (listenMode()) startMic(); sess = buildCheck(); screen = 'play'; render(); enterSlide(); }
 
 /* ---------- answering ---------- */
 function enterSlide() {
@@ -615,6 +646,7 @@ function gotIt(p) {
   p.praise = p.tries === 0 ? pick(PRAISE) : 'There it is.';
   tell(p, `${p.praise} ${p.answerText ? p.answerText() : ''}`);
   record(p, p.tries === 0);
+  if (hearing()) return;
   if (p.hear) playSeq(p.hear); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi);
 }
 function missed(p, wrongLine) {
@@ -625,6 +657,7 @@ function missed(p, wrongLine) {
     p.done = true; p.revealed = true;
     tell(p, `${wrongLine} ${p.answerText ? p.answerText() : ''}`);
     record(p, false);
+    if (hearing()) return;
     if (p.hear) playSeq(p.hear); else if (p.hearP) setTimeout(() => playP(p.hearP), 350); else if (p.hearMidi) tone(p.hearMidi);
   } else if (state.autoSpeak) say(`${wrongLine} Try again.`);
 }
@@ -640,10 +673,10 @@ function answer(idx) {
 function tapKey(midi) {
   const p = sess?.probs[sess.i];
   if (p?.mode === 'row') return rowPress(midi);
-  tone(midi);
+  if (!hearing()) tone(midi);
   if (!p || p.done || p.mode !== 'key') return;
-  const ok = p.okMidi ? p.okMidi(midi) : midi === p.targetMidi;
-  if (ok) { p.chosen = midi; gotIt(p); render(); return; }
+  const ok = p.okMidi ? p.okMidi(midi) : hearing() ? midi % 12 === p.targetMidi % 12 : midi === p.targetMidi;
+  if (ok) { p.chosen = hearing() ? null : midi; gotIt(p); render(); return; }
   if (p.wrongKeys?.includes(midi)) return;
   (p.wrongKeys = p.wrongKeys || []).push(midi);
   let line = `That’s ${isBlack(midi) ? 'a black key: ' + keyName(midi) : keyName(midi)}.`;
@@ -671,7 +704,7 @@ function rowPress(v) {
   const n = p.notes[p.at], ok = p.rowKeys ? v === whiteMidi(n.step) : v === letterOf(n.step);
   if (p.rowKeys) tone(v);
   if (ok) {
-    if (!p.rowKeys) tone(whiteMidi(n.step));
+    if (!p.rowKeys && !hearing()) tone(whiteMidi(n.step));
     n.state = n.tries ? 'late' : 'ok';
     p.lastWrong = null;
     noteDone(p, n, n.tries === 0);
@@ -681,7 +714,7 @@ function rowPress(v) {
   p.misses++;
   const named = p.rowKeys ? keyName(v) : v;
   if (n.tries >= 2) {
-    tone(whiteMidi(n.step));
+    if (!hearing()) tone(whiteMidi(n.step));
     n.state = 'shown';
     p.lastWrong = `Not ${named}. That one is ${letterOf(n.step)}. ${walkWords(p.clef, n.step)}`;
     noteDone(p, n, false);
@@ -756,6 +789,7 @@ function next() {
   if (cur.mode === 'intro') { state.words[cur.wid] = state.words[cur.wid] || { r: 0, m: 0 }; save(); }
   if (sess.i < sess.probs.length - 1) { sess.i++; render(); enterSlide(); window.scrollTo?.({ top: 0 }); return; }
   hush();
+  stopMic();
   if (sess.check) { finishCheck(); lastChanges = []; save(); screen = 'done'; render(); return; }
   const used = [...new Set(sess.probs.filter(p => p.mode !== 'chapter' && p.mode !== 'intro').map(p => p.topic))];
   lastChanges = adjustLevels(used);
@@ -796,14 +830,15 @@ function openSong(id) {
   const s = SONGS.find(x => x.id === id), { bars, flat } = parseSong(s);
   const steps = flat.map(x => stepOf(x.p));
   const lo = Math.min(...steps), hi = Math.max(...steps);
+  if (listenMode()) startMic();
   song = { s, bars, flat, i: 0, misses: 0, letters: false, from: lo - 1, whites: Math.max(8, hi - lo + 3), flash: null, playing: -1 };
   screen = 'song'; render();
 }
 function songTap(midi) {
-  tone(midi);
+  if (!hearing()) tone(midi);
   if (!song || song.playing >= 0 || song.i >= song.flat.length) return;
   const want = midiOf(song.flat[song.i].p);
-  if (midi === want) { song.flash = null; song.i++; if (song.i >= song.flat.length) finishSong(); }
+  if (hearing() ? midi % 12 === want % 12 : midi === want) { song.flash = null; song.i++; if (song.i >= song.flat.length) finishSong(); }
   else { song.misses++; song.flash = `That’s ${keyName(midi)}.`; }
   render(midi !== want);
 }
@@ -894,10 +929,11 @@ function rowStaff(p) {
 }
 function rowButtons(p) {
   if (p.done) return '';
+  if (hearing()) return listenPanel('Listening. Play each note on your piano.');
   if (p.rowKeys) {
     return `<div class="key-wrap live">${pianoSvg({ from: p.from, whites: p.whites, letters: 'c' })}${pianoHint(p)}</div>`;
   }
-  return `<div class="choices letters">${'ABCDEFG'.split('').map(l => `<button class="choice" data-act="row-letter" data-l="${l}">${l}</button>`).join('')}</div>`;
+  return `${micProblem()}<div class="choices letters">${'ABCDEFG'.split('').map(l => `<button class="choice" data-act="row-letter" data-l="${l}">${l}</button>`).join('')}</div>`;
 }
 function pianoFor(p) {
   const marks = {};
@@ -984,7 +1020,10 @@ function renderPlay() {
     controls = p.done ? '' : `<div class="next-row"><button class="start" data-act="check-place" ${p.sel == null ? 'disabled' : ''}>That’s it</button></div><p class="note center">Tap or drag on the staff to move the note.</p>`;
   } else if (p.mode === 'key') {
     const staff = p.item.note ? `<div class="staff-wrap small">${noteStaff(p, 20)}</div>` : '';
-    body = promptRow(p.prompt) + staff + pianoFor(p);
+    // when listening, the real piano replaces the one on screen
+    body = hearing() && !p.done
+      ? promptRow(p.prompt.replace(/^(Tap|Find this note on the piano\.)/, m => m === 'Tap' ? 'Play' : 'Play this note on your piano.')) + staff + listenPanel('Listening.')
+      : promptRow(p.prompt) + staff + micProblem() + pianoFor(p);
   } else if (p.mode === 'real') {
     body = promptRow(p.prompt) + `<div class="staff-wrap">${noteStaff(p)}</div>`;
     controls = p.done ? '' : !p.heard
@@ -1041,12 +1080,12 @@ function renderSong() {
   const pm = {};
   if (playing >= 0) pm[midiOf(flat[playing].p)] = 'ok';
   return `<header class="top"><h1 class="song-title">${esc(s.name)}</h1><button class="ghost" data-act="home">Songs</button></header>
-  <p class="note">${esc(s.tag)} ${state.realPiano ? 'Play along on your piano.' : 'Read each note and tap its key.'}</p>
+  <p class="note">${esc(s.tag)} ${hearing() || state.realPiano ? 'Play along on your piano.' : 'Read each note and tap its key.'}</p>
   <div class="row-btns song-ctrl"><button class="ghost" data-act="song-hear">${playing >= 0 ? '■ Stop' : '♪ Hear the song'}</button><button class="ghost" data-act="song-letters" aria-pressed="${letters}">${letters ? 'Hide letters' : 'Show letters'}</button><button class="ghost" data-act="song-restart">From the top</button></div>
   <div class="song-lines">${linesHtml}</div>
   ${finished ? `<div class="feedback"><span class="big good">You played it!</span><span class="how">${song.misses ? `${song.misses} wrong key${song.misses > 1 ? 's' : ''} along the way. Try it again, or play it on your real piano.` : 'Not one wrong key. Now try it on your real piano.'}</span></div>` : ''}
   ${song.flash ? `<div class="feedback"><span class="try">${esc(song.flash)}</span></div>` : ''}
-  ${!finished ? (state.realPiano ? `<div class="next-row"><button class="start" data-act="song-next">Next note</button></div>` : `<div class="song-keys">${pianoSvg({ from: song.from, whites: song.whites, letters: letters ? 'all' : 'c', marks: pm })}</div>`) : `<div class="row-btns"><button class="start" data-act="song-restart">Play again</button><button class="ghost" data-act="home">Home</button></div>`}`;
+  ${!finished ? (hearing() ? listenPanel('Listening. Play each note on your piano.') : state.realPiano && !listenMode() ? `<div class="next-row"><button class="start" data-act="song-next">Next note</button></div>` : `<div class="song-keys">${pianoSvg({ from: song.from, whites: song.whites, letters: letters ? 'all' : 'c', marks: pm })}</div>`) : `<div class="row-btns"><button class="start" data-act="song-restart">Play again</button><button class="ghost" data-act="home">Home</button></div>`}`;
 }
 const flatLow = flat => pitchOf(Math.min(...flat.map(x => stepOf(x.p))));
 function renderParent() {
@@ -1078,8 +1117,10 @@ function renderParent() {
     <div class="row-btns"><span>Questions per round</span><div class="seg">${[5, 10, 15, 20].map(x => `<button data-act="per" data-n="${x}" aria-pressed="${state.perSession === x}">${x}</button>`).join('')}</div></div>
     <div class="row-btns"><span>Read aloud automatically</span>${seg('autospeak', state.autoSpeak ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">Off: nothing is spoken until you tap the speaker button. Music sounds always play.</p>
-    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['piano', 'Piano keys']])}</div>
-    <p class="note">Letter buttons: any C is answered with the C button. Piano keys: each note must be played on its exact key.</p>
+    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['piano', 'Keys on screen'], ['listen', 'Real piano']])}</div>
+    <p class="note">Letter buttons: any C is answered with the C button. Keys on screen: each note must be tapped on its exact key. Real piano: the microphone listens to ${esc(N())} play. It checks the letter, not the octave, because a microphone can mistake a piano’s octave. Nothing is recorded or sent anywhere.</p>
+    <div class="row-btns"><button class="ghost" data-act="mic-test">${micTest ? 'Stop the test' : 'Test the microphone'}</button></div>
+    ${micTest ? `${mic.status === 'on' ? `<div class="listen-panel"><span class="listen-dot"></span><span class="listen-text">Play single notes, low and high.</span><strong id="heard-exact" class="heard"></strong><span class="mic-bar"><i id="mic-level"></i></span></div><ul class="list" id="mic-log">${micLog.map(x => `<li><span>${esc(x)}</span></li>`).join('')}</ul>` : `<p class="note">${mic.status === 'asking' ? 'Asking to use the microphone…' : mic.status === 'denied' ? 'The microphone is blocked. Allow it for this site in Settings, then try again.' : 'This device can’t use the microphone here.'}</p>`}` : ''}
     <div class="row-btns"><span>Real piano nearby</span>${seg('realpiano', state.realPiano ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">On: "find this key" questions and songs are played on your own piano. The app plays the right note so ${esc(N())} can check by ear. Off: tap the keys on screen.</p>
     <div class="row-btns"><span>Speaking speed</span>${seg('speed', state.speed, [['normal', 'Normal'], ['slow', 'Slower']])}</div>
@@ -1137,7 +1178,7 @@ function resetTopic(k) {
 }
 const ACTIONS = {
   parent() { screen = 'parent'; confirmWipe = false; confirmTopic = null; render(); },
-  home() { hush(); screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
+  home() { hush(); stopMic(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
   chip(d) { state.on[d.k] = !state.on[d.k]; save(); render(); },
   start() { startSession(); window.scrollTo?.({ top: 0 }); },
   check() { startCheck(); window.scrollTo?.({ top: 0 }); },
@@ -1161,6 +1202,11 @@ const ACTIONS = {
   per(d) { state.perSession = +d.n; save(); render(); },
   autospeak(d) { state.autoSpeak = d.v === '1'; save(); render(); },
   answerwith(d) { state.answerWith = d.v; save(); render(); },
+  async 'mic-test'() {
+    micTest = !micTest; micLog = [];
+    if (micTest) await startMic(); else stopMic();
+    render();
+  },
   realpiano(d) { state.realPiano = d.v === '1'; save(); render(); },
   speed(d) { state.speed = d.v; save(); render(); },
   'topic-reset'(d) { confirmTopic = d.k; render(); },

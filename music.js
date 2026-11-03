@@ -202,6 +202,7 @@ function pianoWindow(step, r = Math.random) { return step - (4 + Math.floor(r() 
 
 /* ---------- sound: a small plucked-string piano ---------- */
 let actx = null, masterGain = null, liveNodes = [];
+let soundingUntil = 0;  // when the app's own sound has died away, so the microphone can ignore it
 function audioReady() {
   if (!actx) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -215,6 +216,7 @@ function audioReady() {
 function tone(midi, when = 0, dur = 0.9, vol = 0.6) {
   const a = audioReady();
   if (!a) return;
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + Math.max(.2, dur) + .45) * 1000);
   const t0 = a.currentTime + when + 0.01, f = 440 * Math.pow(2, (midi - 69) / 12);
   const env = a.createGain(), lp = a.createBiquadFilter();
   lp.type = 'lowpass'; lp.frequency.value = Math.min(9000, f * 7 + 500);
