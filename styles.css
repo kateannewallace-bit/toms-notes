@@ -232,7 +232,6 @@ svg.markvis { display: block; width: 100%; max-width: 280px; height: auto; margi
 .song-btn small { display: block; color: var(--chalk-dim); font-size: .8rem; }
 .song-title { font-size: clamp(1.5rem, 5vw, 2.1rem); }
 .song-lines { display: flex; flex-direction: column; gap: 2px; }
-.song-keys { position: sticky; bottom: 8px; background: var(--board); padding: 8px 0 0; border-radius: 8px; }
 .ghost[aria-pressed="true"] { border-color: var(--green); color: var(--green); }
 .song-ctrl { gap: 8px; }
 .song-ctrl .ghost { padding: 6px 12px; font-size: .92rem; }
@@ -304,3 +303,15 @@ svg.staff { max-height: 52vh; }
 /* notes play when tapped */
 .note-hit { fill: transparent; }
 .tap-note { cursor: pointer; }
+
+/* songs fill the screen: controls on top, the music scrolling in the middle, the keys fixed at the bottom */
+body.song-mode { overflow: hidden; padding-block: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-bottom)); }
+body.song-mode .wrap { max-width: 980px; }
+body.song-mode .board { height: calc(100vh - 16px); height: calc(100dvh - 16px); min-height: 0; padding: 12px clamp(12px, 3vw, 28px); gap: 8px; overflow: hidden; }
+body.song-mode .board > * { flex: none; }
+body.song-mode .board > .song-lines { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.song-lines svg.staff { flex: none; width: 100%; max-width: 760px; max-height: none; margin-inline: auto; }
+.song-keys { padding: 0; }
+.song-keys svg.piano { max-height: 30vh; max-height: 30dvh; margin-inline: auto; }
+@media (max-height: 860px) { body.song-mode .board > .note { display: none; } }
+

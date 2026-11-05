@@ -1397,10 +1397,33 @@ function renderSync() {
     <div class="row-btns"><button class="ghost" data-act="sync-now">Sync now</button><button class="link" data-act="sync-off">Stop syncing on this device</button></div></section>`;
 }
 function render(shake) {
+  const lines = document.querySelector('.song-lines'), wasAt = lines ? lines.scrollTop : 0;
+  // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
+  document.body.classList.toggle('song-mode', screen === 'song');
   app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
-  // keep the note being played in sight above the keys
-  if (screen === 'song') document.querySelector('.song-lines .n-head.now, .song-lines .n-open.now')?.closest('svg')?.scrollIntoView?.({ block: 'center' });
+  if (screen === 'song') followSong(wasAt);
+}
+let songGlide = 0;
+// Keeps the line being played at the top of the music, with the next line showing below it.
+function followSong(wasAt) {
+  const box = document.querySelector('.song-lines');
+  if (!box) return;
+  box.scrollTop = wasAt;
+  const line = box.querySelector('.n-head.now')?.closest('svg');
+  if (!line) return;
+  const to = box.scrollTop + line.getBoundingClientRect().top - box.getBoundingClientRect().top - 4;
+  if (Math.abs(to - box.scrollTop) < 2) return;
+  cancelAnimationFrame(songGlide);
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { box.scrollTop = to; return; }
+  // a hand-made glide: the browser's own smooth scroll won't reliably go back up in Safari's engine
+  const from = box.scrollTop, began = performance.now(), ms = 240;
+  const step = now => {
+    const t = Math.min(1, (now - began) / ms);
+    box.scrollTop = from + (to - from) * t * (2 - t);
+    if (t < 1) songGlide = requestAnimationFrame(step);
+  };
+  songGlide = requestAnimationFrame(step);
 }
 
 /* ---------- events ---------- */
