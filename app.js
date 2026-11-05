@@ -247,7 +247,7 @@ function noteProblem(p, it, k) {
   if (mode === 'row' && buildRow(p, it, k)) return;
   if (mode === 'row') mode = LEVELS[k].slice(0, p.level).some(l => l.items.some(i => i.note && parseP(i.p).letter !== p.letter)) ? 'letters' : pick(['place', 'key']);
   // the grown-ups' setting: answer with piano keys instead of letter buttons
-  if (mode === 'letters' && state.answerWith !== 'letters' && p.kind !== 'check') mode = 'key';
+  if (mode === 'letters' && p.kind !== 'check' && (state.answerWith === 'mix' ? rng() < .5 : state.answerWith !== 'letters')) mode = 'key';
   if (mode === 'key') {
     p.mode = state.realPiano && !listenMode() ? 'real' : 'key';
     delete p.lo; delete p.hi;
@@ -287,7 +287,8 @@ function buildRow(p, it, k) {
   p.prompt = 'Read the notes from left to right.';
   p.notes = row.map(i => ({ wid: i.wid, p: i.p, step: stepOf(i.p), tries: 0, state: '' }));
   p.at = 0; p.misses = 0;
-  if (state.answerWith === 'piano' && !state.realPiano) {
+  // in a mix, each row is all letters or all keys, so the buttons never change partway through
+  if ((state.answerWith === 'piano' || (state.answerWith === 'mix' && rng() < .5)) && !state.realPiano) {
     const steps = p.notes.map(x => x.step), lo = Math.min(...steps), hi = Math.max(...steps);
     p.from = lo - 1; p.whites = Math.max(8, hi - lo + 3); p.rowKeys = true;
   }
@@ -1352,8 +1353,8 @@ function renderParent() {
     <div class="row-btns"><span>Questions per round</span><div class="seg">${[5, 10, 15, 20].map(x => `<button data-act="per" data-n="${x}" aria-pressed="${state.perSession === x}">${x}</button>`).join('')}</div></div>
     <div class="row-btns"><span>Read aloud automatically</span>${seg('autospeak', state.autoSpeak ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">Off: nothing is spoken until you tap the speaker button. Music sounds always play.</p>
-    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['piano', 'Keys on screen'], ['listen', 'Real piano']])}</div>
-    <p class="note">Letter buttons: any C is answered with the C button. Keys on screen: each note must be tapped on its exact key. Real piano: the microphone listens to ${esc(N())} play. It checks the letter, not the octave, because a microphone can mistake a piano’s octave. Nothing is recorded or sent anywhere.</p>
+    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['piano', 'Keys on screen'], ['mix', 'Mix of both'], ['listen', 'Real piano']])}</div>
+    <p class="note">Letter buttons: any C is answered with the C button. Keys on screen: each note must be tapped on its exact key. Mix of both: some questions use letters and some use keys, about half and half. Real piano: the microphone listens to ${esc(N())} play. It checks the letter, not the octave, because a microphone can mistake a piano’s octave. Nothing is recorded or sent anywhere.</p>
     <div class="row-btns"><button class="ghost" data-act="mic-test">${micTest ? 'Stop the test' : 'Test the microphone'}</button></div>
     ${micTest ? `${mic.status === 'on' ? `<div class="listen-panel"><span class="listen-dot"></span><span class="listen-text">Play single notes, low and high.</span><strong id="heard-exact" class="heard"></strong><span class="mic-bar"><i id="mic-level"></i></span></div><ul class="list" id="mic-log">${micLog.map(x => `<li><span>${esc(x)}</span></li>`).join('')}</ul>` : `<p class="note">${mic.status === 'asking' ? 'Asking to use the microphone…' : mic.status === 'denied' ? 'The microphone is blocked. Allow it for this site in Settings, then try again.' : 'This device can’t use the microphone here.'}</p>`}` : ''}
     <div class="row-btns"><span>Real piano nearby</span>${seg('realpiano', state.realPiano ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
