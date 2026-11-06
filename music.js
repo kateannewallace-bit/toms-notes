@@ -311,6 +311,38 @@ function tone(midi, when = 0, dur = 0.9, vol = 0.6) {
   });
   if (liveNodes.length > 200) liveNodes = liveNodes.slice(-100);
 }
+// A bull's grunt, made from a low buzzy voice through a muffling filter, with a puff of breath.
+// 'happy': two quick grunts rising, hm-HM! 'sad': one long, sinking groan. It plays alongside other sounds and never stops them.
+function grunt(kind, when = 0) {
+  const a = audioReady();
+  if (!a) return;
+  const happy = kind === 'happy';
+  const parts = happy ? [[0, .16, 105, 128], [.2, .24, 120, 150]] : [[0, .75, 112, 70]];
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + 1.2) * 1000);
+  for (const [start, len, f0, f1] of parts) {
+    const t0 = a.currentTime + when + start + .01, os = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+    os.type = 'sawtooth';
+    os.frequency.setValueAtTime(f0, t0);
+    os.frequency.linearRampToValueAtTime(f1, t0 + len);
+    lp.type = 'lowpass'; lp.frequency.value = happy ? 900 : 650; lp.Q.value = 4;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(.3, t0 + .03);
+    g.gain.setValueAtTime(.3, t0 + len * .6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    os.connect(lp); lp.connect(g); g.connect(masterGain);
+    os.start(t0); os.stop(t0 + len + .05);
+    liveNodes.push(os);
+    // the breath: a short hiss of noise through the same muffled voice
+    const n = Math.floor(a.sampleRate * len), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * .35;
+    const src = a.createBufferSource(), bp = a.createBiquadFilter(), ng = a.createGain();
+    src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = .8;
+    ng.gain.setValueAtTime(.14, t0); ng.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    src.connect(bp); bp.connect(ng); ng.connect(masterGain);
+    src.start(t0); src.stop(t0 + len);
+    liveNodes.push(src);
+  }
+}
 function hush() { for (const n of liveNodes) { try { n.stop(); } catch (e) {} } liveNodes = []; clearSeqTimers(); }
 let seqTimers = [];
 const clearSeqTimers = () => { seqTimers.forEach(clearTimeout); seqTimers = []; };

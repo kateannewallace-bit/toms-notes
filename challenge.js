@@ -36,11 +36,11 @@ function nextPlacard() {
   game.target = next; game.last = next;
   game.phase = 'in'; game.x = -.4; game.missed = false; game.mood = 'happy'; game.pose = 'hold';
 }
-// A pass takes about six seconds from when he appears to when he's gone. Each Challenge won makes the next level
-// a little quicker, down to about four seconds.
-const PHASE_MS = { in: 1800, wait: 2400, out: 1800, scowl: 1200, flee: 900, fly: 1000, collapse: 2400 };
+// A pass takes about nine seconds at level 1, from when he appears to when he's gone. Each Challenge won makes
+// the next level a little quicker: about six seconds by level 7, and never quicker than about four.
+const PHASE_MS = { in: 2700, wait: 3600, out: 2700, scowl: 1200, flee: 900, fly: 1000, collapse: 2400 };
 const challengeLevel = () => (state.challenge?.wins || 0) + 1;
-const lapSpeed = () => Math.max(.67, 1 - (challengeLevel() - 1) * .06);
+const lapSpeed = () => Math.max(.45, 1 - (challengeLevel() - 1) * .056);
 function challengeFrame(now) {
   if (!game || screen !== 'challenge') return;
   const ms = PHASE_MS[game.phase] * (['in', 'wait', 'out'].includes(game.phase) ? lapSpeed() : 1), t = Math.min(1, (now - game.t0) / ms);
@@ -98,26 +98,30 @@ function loseHorn() {
     game.mood = 'dizzy'; game.pose = 'heap'; game.x = .5;
     setPhase('collapse');
     // a sad sound: a slow slide down
-    playSeq([{ midi: 64, beats: .7 }, { midi: 63, beats: .7 }, { midi: 62, beats: .7 }, { midi: 61, beats: 1.6 }], 80);
+    // after the last wrong note and its grunt have finished, so it doesn't cut them off
+    setTimeout(() => { if (screen === 'challenge') playSeq([{ midi: 64, beats: .7 }, { midi: 63, beats: .7 }, { midi: 62, beats: .7 }, { midi: 61, beats: 1.6 }], 80); }, 1300);
     game.raf = requestAnimationFrame(challengeFrame);
   }
 }
 function challengeKey(midi) {
-  if (!game || game.over || !['in', 'wait'].includes(game.phase) || game.missed) { if (!hearing()) tone(midi); return; }
+  // the note Tom plays always sounds in full, clearly; the grunt comes after it, never over it
+  const playIt = () => { if (!hearing()) tone(midi, 0, 1.1, .85); };
+  if (!game || game.over || !['in', 'wait'].includes(game.phase) || game.missed) { playIt(); return; }
   const want = midiOf(game.target[1]);
   const ok = hearing() ? midi % 12 === want % 12 : midi === want;
-  if (!hearing()) tone(midi);
+  playIt();
   if (ok) {
     game.caught++;
     updateHud();
     game.mood = 'happy'; game.pose = 'thumbs';
     setPhase('fly');
-    setTimeout(() => { if (!hearing()) playSeq([{ midi: 72, beats: .25 }, { midi: 76, beats: .25 }, { midi: 79, beats: .6 }], 120); }, 150);
+    grunt('happy', hearing() ? 0 : .8);
     return;
   }
   // wrong: he stops and scowls, Tom loses a pair of horns, then he runs off to come round again
   game.missed = true;
   game.mood = 'scowl';
+  grunt('sad', hearing() ? 0 : .7);
   loseHorn();
   if (game.over) return;
   setPhase('scowl');
