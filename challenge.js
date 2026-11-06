@@ -38,7 +38,7 @@ function nextPlacard() {
 }
 // A pass takes about six seconds from when he appears to when he's gone. Each Challenge won makes the next level
 // a little quicker, down to about four seconds.
-const PHASE_MS = { in: 1800, wait: 2400, out: 1800, flee: 900, fly: 1000, collapse: 1400 };
+const PHASE_MS = { in: 1800, wait: 2400, out: 1800, scowl: 1200, flee: 900, fly: 1000, collapse: 2400 };
 const challengeLevel = () => (state.challenge?.wins || 0) + 1;
 const lapSpeed = () => Math.max(.67, 1 - (challengeLevel() - 1) * .06);
 function challengeFrame(now) {
@@ -51,6 +51,7 @@ function challengeFrame(now) {
   if (t >= 1) {
     if (game.phase === 'in') setPhase('wait');
     else if (game.phase === 'wait') { game.from = .5; setPhase('out'); }
+    else if (game.phase === 'scowl') { game.from = game.x; setPhase('flee'); }
     else if (game.phase === 'out' || game.phase === 'flee') {
       // he left without the right note: a miss if Tom didn't press anything, then another lap with the same note
       if (!game.missed) { loseHorn(); if (game.over) return; }
@@ -71,6 +72,7 @@ function placeBeast(t) {
   el.style.left = `${game.x * 100}%`;
   el.style.transform = `translate(-50%, ${lift}%)${game.phase === 'collapse' ? ` rotate(${Math.min(1, t * 1.6) * 82}deg) translateY(${Math.min(1, t * 1.6) * 18}%)` : ''}`;
   el.classList.toggle('running', ['in', 'out', 'flee'].includes(game.phase));
+  el.classList.toggle('stomping', game.phase === 'scowl');
 }
 function drawBeast() {
   const el = document.getElementById('runner');
@@ -113,13 +115,12 @@ function challengeKey(midi) {
     setTimeout(() => { if (!hearing()) playSeq([{ midi: 72, beats: .25 }, { midi: 76, beats: .25 }, { midi: 79, beats: .6 }], 120); }, 150);
     return;
   }
-  // wrong: he scowls, loses Tom a pair of horns, and runs off to come round again
+  // wrong: he stops and scowls, Tom loses a pair of horns, then he runs off to come round again
   game.missed = true;
   game.mood = 'scowl';
   loseHorn();
   if (game.over) return;
-  game.from = game.x;
-  setPhase('flee');
+  setPhase('scowl');
 }
 function finishChallenge(result) {
   cancelAnimationFrame(game.raf);

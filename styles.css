@@ -375,4 +375,7 @@ body.game-mode .board > * { flex: none; }
 .game-keys svg.piano { max-height: 30vh; max-height: 30dvh; margin-inline: auto; }
 .challenge-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; border: 2px solid var(--chalk); border-radius: 10px; padding: 14px 16px; }
 .challenge-card .note { margin-top: 4px; }
+.runner.stomping .beast-figure { animation: stomp .3s ease-in-out 4; }
+@keyframes stomp { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-2%) rotate(-3deg); } 75% { transform: translateY(-2%) rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .runner.stomping .beast-figure { animation: none; } }
 
