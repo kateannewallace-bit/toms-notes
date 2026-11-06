@@ -120,8 +120,10 @@ function staffSvg(o) {
   const c = o.clef || 't', S = o.S || 14, top = topOf(c), bottom = CLEF[c].bottom;
   const notes = (o.items || []).filter(i => i.p);
   const steps = notes.map(i => stepOf(i.p)).concat(o.lo ?? [], o.hi ?? []);
-  const maxS = Math.max(top + (c === 't' ? 3 : 0), ...steps), minS = Math.min(bottom - (c === 't' ? 4 : 0), ...steps);
-  const yTop = (maxS - top) / 2 * S + S * 2.2, staffH = S * 4, h = yTop + staffH + (bottom - minS) / 2 * S + S * 2.2;
+  // tight: only as much room as the clef and the notes need, for a staff that should fill its space (the Challenge sign)
+  const maxS = o.tight ? Math.max(top + 2, ...steps) : Math.max(top + (c === 't' ? 3 : 0), ...steps), minS = o.tight ? Math.min(bottom - (c === 't' ? 3 : 1), ...steps) : Math.min(bottom - (c === 't' ? 4 : 0), ...steps);
+  const pad = o.tight ? S * 1.1 : S * 2.2;
+  const yTop = (maxS - top) / 2 * S + pad, staffH = S * 4, h = yTop + staffH + (bottom - minS) / 2 * S + pad;
   const Y = s => yTop + (top - s) * S / 2;
   const w = o.width || 300;
   const clefW = o.noClef ? S : S * 3.4;

@@ -183,6 +183,7 @@ function micNote(midi) {
     return;
   }
   if (screen === 'song' && song) return songTap(midi);
+  if (screen === 'challenge') return challengeKey(midi);
   if (screen !== 'play' || !sess) return;
   const p = sess.probs[sess.i];
   if (p.mode === 'row') rowPress(keyName(midi));
@@ -1320,6 +1321,10 @@ function renderHome() {
     <div class="chips">${ORDER.map(chip).join('')}</div>
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
+  <section class="challenge-card">
+    <div><h2>Note Beast Challenge</h2><p class="note">Note Beast runs past with a note on his sign. Play it before he runs off! Catch ${CHALLENGE_GOAL} to win. Level ${challengeLevel()}${state.challenge?.wins ? `, after ${state.challenge.wins} win${state.challenge.wins > 1 ? 's' : ''}` : ''}.</p></div>
+    <button class="start" data-act="challenge">Play</button>
+  </section>
   <section>
     <h2>Songs to play</h2>
     <div class="songs">${SONGS.map(s => { const r = state.songs[s.id]; return `<button class="song-btn" data-act="song" data-id="${s.id}">${r ? starSvg(r.best === 0) : starSvg(false)}<span><strong>${esc(s.name)}</strong><small>${esc(s.tag)}</small></span></button>`; }).join('')}</div>
@@ -1640,10 +1645,12 @@ function render(shake) {
   const lines = document.querySelector('.song-lines'), wasAt = lines ? lines.scrollTop : 0;
   // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
   document.body.classList.toggle('song-mode', screen === 'song');
-  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : renderHome();
+  document.body.classList.toggle('game-mode', screen === 'challenge');
+  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
   if (screen === 'play' || screen === 'done') showBeast();
+  if (screen === 'challenge' && game && !game.finished) { drawBeast(); updateHud(); }
 }
 // The Note Beast appears beside the feedback once there's an answer: delighted when it's right, concerned when it isn't.
 let beastShown = '', beastLine = '';
@@ -1709,7 +1716,7 @@ function resetTopic(k) {
 }
 const ACTIONS = {
   parent() { screen = 'parent'; confirmWipe = false; confirmTopic = null; render(); },
-  home() { hush(); stopMic(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
+  home() { if (game) { cancelAnimationFrame(game.raf); game = null; } hush(); stopMic(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
   chip(d) { state.on[d.k] = !state.on[d.k]; save(); render(); },
   start() { startSession(); window.scrollTo?.({ top: 0 }); },
   check() { startCheck(); window.scrollTo?.({ top: 0 }); },
@@ -1725,6 +1732,7 @@ const ACTIONS = {
   'said-yes'() { selfCheck(true); },
   'said-no'() { selfCheck(false); },
   song(d) { openSong(d.id); window.scrollTo?.({ top: 0 }); },
+  challenge() { startChallenge(); window.scrollTo?.({ top: 0 }); },
   map() { audioReady(); screen = 'map'; render(); window.scrollTo?.({ top: 0 }); },
   'song-hear'() { hearSong(); },
   'song-letters'() { song.letters = !song.letters; render(); },
@@ -1757,6 +1765,7 @@ app.addEventListener('click', e => {
   if (key) {
     audioReady();
     if (screen === 'song') { if (!state.realPiano) songTap(+key.dataset.midi); return; }
+    if (screen === 'challenge') { challengeKey(+key.dataset.midi); return; }
     if (screen === 'play' && key.closest('.key-wrap.live')) tapKey(+key.dataset.midi);
     return;
   }
