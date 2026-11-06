@@ -1,6 +1,6 @@
 {
-  "name": "Tom's Note Hunt",
-  "short_name": "Note Hunt",
+  "name": "Note Beast",
+  "short_name": "Note Beast",
   "description": "Learn to read music in real notation, from ledger lines to first songs.",
   "start_url": "./",
   "scope": "./",

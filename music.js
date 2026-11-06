@@ -114,7 +114,7 @@ function drawRest(d, x, S, Y, c, cls = '') {
   return glyph('erest', x - S * .7, Y(bottom), S, cls);
 }
 // staff({ clef, items, S, width, time, lo, hi, live, walk, extra })
-// items: { p, d, cls, acc } a note · { r: 'q' } a rest · { bar: 1 } a bar line · { gap: 'q' } a dashed box for a missing note
+// items: { p, d, cls, acc } a note · { skip: 1 } an empty column · { r: 'q' } a rest · { bar: 1 } a bar line · { gap: 'q' } a dashed box for a missing note
 // Items spread out across the width by length. lo/hi force room for that range of steps.
 function staffSvg(o) {
   const c = o.clef || 't', S = o.S || 14, top = topOf(c), bottom = CLEF[c].bottom;
@@ -142,6 +142,7 @@ function staffSvg(o) {
   }
   items.forEach((it, i) => {
     const at = placed[i];
+    if (it.skip) return;  // an empty column, so notes line up across the two staffs of a grand staff
     if (it.bar) {
       if (it.bar === 'end') out += `<line class="st-bar" x1="${at - 5}" x2="${at - 5}" y1="${yTop}" y2="${yTop + staffH}"/><rect class="n-head" x="${at - 1}" y="${yTop}" width="4" height="${staffH}"/>`;
       else out += `<line class="st-bar" x1="${at}" x2="${at}" y1="${yTop}" y2="${yTop + staffH}"/>`;
@@ -167,8 +168,18 @@ function staffSvg(o) {
     else out += `<text class="walk final" x="${tx + S * 1.5}" y="${Y(steps[steps.length - 1]) + S * .42}" font-size="${S * 1.2}">${letterOf(steps[steps.length - 1])}</text>`;
   }
   if (o.extra) out += o.extra({ Y, S, x: placed, w, yTop, staffH });
+  if (o.parts) return { inner: out, h: Math.ceil(h), yTop, staffH, w };
   const live = o.live ? ` data-live="1" data-c="${c}" data-lo="${o.lo}" data-hi="${o.hi}" data-ytop="${yTop}" data-s="${S}"` : '';
   return `<svg class="staff ${o.cl || ''}" viewBox="0 0 ${w} ${Math.ceil(h)}"${live} role="img" aria-label="${o.label || 'Music staff'}">${out}${o.live ? `<g id="placed">${o.placed || ''}</g><rect class="live-hit" x="0" y="0" width="${w}" height="${Math.ceil(h)}"/>` : ''}</svg>`;
+}
+// Two staffs joined by a brace and a line at the left: treble on top, bass below.
+function grandSvg(o) {
+  const S = o.S || 14, w = o.width || 360, L = S * 1.7;
+  const top = staffSvg({ clef: 't', S, width: w - L, even: o.even, items: o.t || [], lo: Math.min(stepOf('C4'), ...(o.t || []).filter(i => i.p).map(i => stepOf(i.p))), parts: true });
+  const low = staffSvg({ clef: 'b', S, width: w - L, even: o.even, items: o.b || [], hi: Math.max(stepOf('C4'), ...(o.b || []).filter(i => i.p).map(i => stepOf(i.p))), parts: true });
+  const y0 = top.yTop, y1 = top.h + low.yTop + low.staffH, [bx0, by0, bx1, by1] = GLYPHS.brace.b, ky = (y1 - y0) / (by1 - by0), kx = Math.min(ky, S * 1.25 / (bx1 - bx0));
+  const brace = `<path class="gl" transform="translate(${(L - (bx1 - bx0) * kx) / 2 - bx0 * kx} ${y1}) scale(${kx.toFixed(4)} ${(-ky).toFixed(4)})" d="${GLYPHS.brace.d}"/>`;
+  return `<svg class="staff grand ${o.cl || ''}" viewBox="0 0 ${w} ${top.h + low.h}" role="img" aria-label="Grand staff: treble staff on top, bass staff below">${brace}<line class="st-bar" x1="${L + 4}" x2="${L + 4}" y1="${y0}" y2="${y1}"/><g transform="translate(${L} 0)">${top.inner}</g><g transform="translate(${L} ${top.h})">${low.inner}</g></svg>`;
 }
 // The note being placed on a live staff (the head only, with its ledger lines).
 function placedNote(c, s, x, S, yTop, cls = 'placing') {

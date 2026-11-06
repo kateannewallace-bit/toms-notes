@@ -5,6 +5,9 @@ const n = (clef, p) => ({ note: 1, clef, p });
 const both = p => [n('t', p), n('b', p)];
 
 const TOPICS = [
+  { id: 'basics', name: 'Staff basics', note: 'Start here', star: true },
+  { id: 'findc', name: 'Finding Middle C', note: 'Which clef? Where is C?', star: true },
+  { id: 'clefnotes', name: 'Finding the Clef Notes', note: 'Middle C, treble G, bass F', star: true },
   { id: 'path', name: 'Out from Middle C', note: 'Both clefs, one step at a time', star: true },
   { id: 'reading', name: 'Staff to keys', note: 'See it, play it' },
   { id: 'keys', name: 'Piano keys', note: 'Find your way' },
@@ -17,6 +20,51 @@ const TOPICS = [
 
 /* Every level: a chapter plus the things it adds. Earlier levels keep coming back for review. */
 const LEVELS = {
+  clefnotes: [
+    { name: 'Treble G and bass F', items: [{ wid: 'clefnotes:G1', target: 'G4', clef: 't', count: 1 }, { wid: 'clefnotes:F1', target: 'F3', clef: 'b', count: 1 }],
+      lesson: 'Two more notes to know by heart. On the treble clef, G sits on the second line, the line the clef curls around. On the bass clef, F sits on the fourth line, between the clef’s two dots. Together with Middle C, these are your landmarks for finding every other note.',
+      show: { basic: 'landmarks' } },
+    { name: 'Landmarks with another note', items: [{ wid: 'clefnotes:G2', target: 'G4', clef: 't', count: 2 }, { wid: 'clefnotes:F2', target: 'F3', clef: 'b', count: 2 }, { wid: 'clefnotes:Ct2', target: 'C4', clef: 't', count: 2 }, { wid: 'clefnotes:Cb2', target: 'C4', clef: 'b', count: 2 }],
+      lesson: 'Now each landmark has company: one other note nearby. Look at the clef first. Then find Middle C on its short line, G on the treble clef’s second line, or F on the bass clef’s fourth line.',
+      show: { basic: 'landmarks' } },
+    { name: 'Landmarks on the grand staff', items: [{ wid: 'clefnotes:Gg3', target: 'G4', grand: 1, count: 3 }, { wid: 'clefnotes:Fg3', target: 'F3', grand: 1, count: 3 }, { wid: 'clefnotes:Ctg3', target: 'C4', clef: 't', grand: 1, count: 3 }, { wid: 'clefnotes:Cbg3', target: 'C4', clef: 'b', grand: 1, count: 3 }],
+      lesson: 'Piano music shows both staffs at once. Treble G is on the second line of the top staff. Bass F is on the fourth line of the bottom staff. Middle C sits between them, written just below the top staff or just above the bottom one.',
+      show: { basic: 'grandmarks' } },
+    { name: 'Landmarks among more notes', items: [{ wid: 'clefnotes:Gg5', target: 'G4', grand: 1, count: 5 }, { wid: 'clefnotes:Fg5', target: 'F3', grand: 1, count: 5 }, { wid: 'clefnotes:Ctg5', target: 'C4', clef: 't', grand: 1, count: 5 }, { wid: 'clefnotes:Cbg5', target: 'C4', clef: 'b', grand: 1, count: 5 }],
+      lesson: 'More notes now, spread over both staffs. Find the landmark quickly: G on the treble’s second line, F on the bass’s fourth line, Middle C between the staffs.',
+      show: { basic: 'grandmarks' } },
+  ],
+  findc: [
+    { name: 'Middle C alone', items: [{ wid: 'findc:t1', findC: 1, clef: 't' }, { wid: 'findc:b1', findC: 1, clef: 'b' }],
+      lesson: 'Middle C sits in a different place on each clef. On the treble clef it hangs just below the staff, on a short line of its own. On the bass clef it sits just above the staff, on a short line of its own. Look at the clef first, then find Middle C.',
+      show: { pair: ['C4', 'C4'] } },
+    { name: 'Middle C and one other note', items: [{ wid: 'findc:t2', findC: 2, clef: 't' }, { wid: 'findc:b2', findC: 2, clef: 'b' }],
+      lesson: 'Now Middle C has company: one other note, up to a sixth higher or lower. Look at the clef first, then find Middle C on its short line.',
+      show: { pair: ['C4', 'C4'] } },
+  ],
+  basics: [
+    { name: 'The staff', items: [{ wid: 'basic:lineSpace', basic: 'lineSpace' }, { wid: 'basic:whichLine', basic: 'whichLine' }, { wid: 'basic:whichSpace', basic: 'whichSpace' }],
+      lesson: 'Music is written on a staff: five lines with four spaces between them. We count them from the bottom up. A note can sit on a line, with the line going through its middle, or in a space, between two lines.',
+      show: { basic: 'staff' } },
+    { name: 'Higher and lower', items: [{ wid: 'basic:higher', basic: 'higher' }, { wid: 'basic:lower', basic: 'lower' }],
+      lesson: 'The higher a note sits on the staff, the higher it sounds. On the piano, higher notes are further to the right, and lower notes are further to the left.',
+      show: { basic: 'highlow' } },
+    { name: 'The musical alphabet', items: [{ wid: 'basic:next', basic: 'next' }, { wid: 'basic:before', basic: 'before' }, { wid: 'basic:stepUp', basic: 'stepUp' }],
+      lesson: 'Music uses only seven letters: A B C D E F G. After G it starts again at A. Each step up the staff, from a line to the next space or a space to the next line, is the next letter. Each step down is the letter before.',
+      show: { basic: 'alphabet' } },
+    { name: 'The treble clef', items: [{ wid: 'basic:trebleName', basic: 'trebleName' }, { wid: 'basic:trebleLine', basic: 'trebleLine' }, { wid: 'basic:trebleG', basic: 'trebleG' }],
+      lesson: 'A clef at the start of the staff tells you which notes the lines and spaces stand for. This is the treble clef. It is also called the G clef, because it curls around the second line, and that line is G. The treble staff is usually for higher notes and the right hand.',
+      show: { basic: 'treble' } },
+    { name: 'The bass clef', items: [{ wid: 'basic:bassName', basic: 'bassName' }, { wid: 'basic:bassLine', basic: 'bassLine' }, { wid: 'basic:bassF', basic: 'bassF' }],
+      lesson: 'This is the bass clef. It is also called the F clef, because its two dots sit on either side of the fourth line, and that line is F. The bass staff is usually for lower notes and the left hand.',
+      show: { basic: 'bass' } },
+    { name: 'What clef is this?', items: [{ wid: 'basic:whichClef', basic: 'whichClef' }, { wid: 'basic:whichHand', basic: 'whichHand' }],
+      lesson: 'Always look at the clef first. It tells you how to read every note on that staff. A treble clef curls around the G line. A bass clef has two dots around the F line.',
+      show: { basic: 'clefs' } },
+    { name: 'The grand staff', items: [{ wid: 'basic:grandTop', basic: 'grandTop' }, { wid: 'basic:grandWhich', basic: 'grandWhich' }, { wid: 'basic:grandMidC', basic: 'grandMidC' }],
+      lesson: 'Piano music uses two staffs joined by a brace: the treble staff on top for the right hand, and the bass staff below for the left hand. This is the grand staff. Middle C sits between them, on a short line of its own called a ledger line. It can be written just below the treble staff or just above the bass staff, and it is the same key either way.',
+      show: { basic: 'grand' } },
+  ],
   // The path: Middle C on both clefs first, then one letter further out each way, on both clefs.
   path: [
     { name: 'Middle C on both clefs', items: both('C4'),
@@ -417,6 +465,39 @@ const SONGS = [
   { id: 'buns-deep', name: 'Hot Cross Buns, low', clef: 'b', time: [4, 4], tag: 'Bass staff, ledger lines below: E, D, C.', ledger: 1,
     notes: 'E2:q D2:q C2:h | E2:q D2:q C2:h | C2:e C2:e C2:e C2:e D2:e D2:e D2:e D2:e | E2:q D2:q C2:h' },
 ];
+
+// What the Note Beast says beside his picture.
+const BEAST_SAYS = {
+  happy: [
+    'Note Beast is pleased!',
+    'Note Beast gives a happy snort!',
+    'Note Beast stamps his hooves with joy!',
+    'Note Beast is very impressed.',
+    'Note Beast approves. Mighty reading!',
+    'Note Beast’s horns are tingling with delight!',
+    'Note Beast does a little dance!',
+    'Note Beast nods his great shaggy head.',
+  ],
+  worried: [
+    'Note Beast thinks you need to practice, or he shall devour you!',
+    'Note Beast frowns. Look again!',
+    'Hmm. Note Beast is not convinced.',
+    'Note Beast’s tummy is rumbling. Practice, or else!',
+    'Note Beast snorts. Try that again!',
+    'Note Beast is worried about you.',
+    'Note Beast scratches his horns. That wasn’t it.',
+  ],
+  doneHappy: [
+    'Note Beast is very pleased with your reading!',
+    'Note Beast roars with delight!',
+    'Note Beast says you may live another day.',
+  ],
+  doneWorried: [
+    'Note Beast thinks you need to practice, or he shall devour you!',
+    'Note Beast wants another round. He is getting hungry.',
+    'Note Beast is not satisfied. Practice more!',
+  ],
+};
 
 const PRAISE = ['Yes.', 'That’s right.', 'Correct.', 'Well read.', 'Good eye.', 'Exactly.'];
 

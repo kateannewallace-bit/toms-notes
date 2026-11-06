@@ -315,3 +315,33 @@ body.song-mode .board > .song-lines { flex: 1 1 0; min-height: 0; overflow-y: au
 .song-keys svg.piano { max-height: 30vh; max-height: 30dvh; margin-inline: auto; }
 @media (max-height: 860px) { body.song-mode .board > .note { display: none; } }
 
+/* Staff basics and the Note Map */
+.map-l { fill: var(--chalk); font-family: var(--font); font-weight: 700; }
+.map-l.space { fill: var(--chalk-dim); font-weight: 400; }
+.map-l.mid { fill: var(--blue); }
+.map-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.map-scroll svg.staff { min-width: 760px; max-height: none; }
+svg.staff.grand { max-height: 60vh; }
+.findc-wrap { max-width: 560px; }
+.findc-wrap .note-hit { cursor: pointer; }
+
+/* the Note Beast */
+.feedback.with-beast { flex-direction: row; justify-content: center; align-items: center; gap: 18px; }
+.feedback.with-beast .fb-text { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; min-width: 0; flex: 0 1 auto; }
+.beast { flex: none; width: clamp(120px, 22vw, 170px); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.beast-art { display: block; width: 74%; height: auto; }
+.done-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.done-beast .beast { width: clamp(96px, 20vw, 150px); }
+@keyframes beast-pop { 0% { transform: scale(.6) rotate(-6deg); opacity: 0; } 60% { transform: scale(1.08) rotate(2deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+@keyframes beast-shake { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-5deg); } 70% { transform: rotate(4deg); } }
+.beast.happy.pop { animation: beast-pop .45s ease-out; }
+.beast.worried.pop { animation: beast-shake .5s ease-in-out; }
+@media (prefers-reduced-motion: reduce) { .beast.pop { animation: none; } }
+@media (max-width: 520px) { .feedback.with-beast { gap: 10px; } }
+.beast-says { position: relative; margin: 0; padding: 6px 10px; border: 2px solid var(--chalk); border-radius: 12px; background: #fff; color: var(--chalk); font-size: .84rem; line-height: 1.25; font-weight: 600; text-align: center; text-wrap: balance; }
+.beast-says::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 12px; height: 12px; background: #fff; border-right: 2px solid var(--chalk); border-bottom: 2px solid var(--chalk); transform: translateX(-50%) rotate(45deg); }
+.beast.worried .beast-says { border-color: var(--pink); }
+.beast.worried .beast-says::after { border-color: var(--pink); }
+.app-name { display: flex; flex-direction: column; gap: 2px; }
+.app-name .hello { margin: 0; font-size: 1.25rem; color: var(--chalk-dim); }
+

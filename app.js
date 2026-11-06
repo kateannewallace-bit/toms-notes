@@ -33,16 +33,21 @@ const startOfDay = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return 
 function defaultState() {
   return {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
-    on: { path: true, reading: true },
+    on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
     sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', updatedAt: 0,
   };
 }
 function normalize(s) {
+  const hadBasics = !!(s && s.basicsAdded), hadFindC = !!(s && s.findcAdded), hadClefNotes = !!(s && s.clefnotesAdded);
   s = Object.assign(defaultState(), s || {});
   s.levels = Object.assign(defaultState().levels, s.levels);
   s.on = Object.assign({}, s.on);
   s.mastered = Object.assign({}, s.mastered);
+  // Staff basics arrived after Tom had started: it switches on once, and Out from Middle C waits for it.
+  if (!hadBasics) { s.basicsAdded = 1; s.on.basics = true; }
+  if (!hadFindC) { s.findcAdded = 1; s.on.findc = true; }
+  if (!hadClefNotes) { s.clefnotesAdded = 1; s.on.clefnotes = true; }
   for (const k of Object.keys(s.mastered)) if (LEVELS[k] && (s.levels[k] || 1) < LEVELS[k].length) { delete s.mastered[k]; s.levels[k]++; }
   // The note topics were once ledger, treble and bass. They are one path now: known notes keep counting, and review cards carry over.
   if (s.on.ledger || s.on.treble || s.on.bass || s.levels.ledger) {
@@ -223,6 +228,8 @@ function makeProblem(k, level, seed, kind = 'current', wid) {
   else if (item.accSym || item.enh || item.cancel || item.ks || item.ksPlay) accidentalProblem(p, item);
   else if (item.mark || item.markBack) markProblem(p, item);
   else if (item.ear || item.see) earProblem(p, item);
+  else if (item.basic) basicProblem(p, item);
+  else if (item.findC || item.target) findCProblem(p, item);
   rng = Math.random;
   return p;
 }
@@ -293,6 +300,188 @@ function buildRow(p, it, k) {
     p.from = lo - 1; p.whites = Math.max(8, hi - lo + 3); p.rowKeys = true;
   }
   return true;
+}
+// Finding Middle C: say which clef it is, then tap Middle C among the noteheads.
+// Level 2 adds one other note, up to a major sixth from Middle C (E below to A above).
+// Finding Middle C and Finding the Clef Notes: name the clef, then tap the landmark note among the noteheads.
+// The landmarks are Middle C, treble G on the second line and bass F on the fourth line.
+// Other notes are white keys up to a major sixth from the landmark, never with its letter, so only one notehead is right.
+// On the grand staff there's no clef question: both clefs are there, and the question says which staff to look at.
+const LANDMARK = {
+  C4: { name: 'Middle C', ask: () => 'Which note is Middle C? Tap it.', where: c => `Middle C ${c === 't' ? 'hangs just below the treble staff' : 'sits just above the bass staff'}, on a short line of its own.` },
+  G4: { name: 'G', ask: () => 'Which note is G? Tap it.', where: () => 'Treble G sits on the second line, the line the treble clef curls around.' },
+  F3: { name: 'F', ask: () => 'Which note is F? Tap it.', where: () => 'Bass F sits on the fourth line, between the bass clef’s two dots.' },
+};
+const STAFF_WHITES = { t: ['E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F5'], b: ['G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3'] };
+function findCProblem(p, it) {
+  const target = it.target || 'C4', count = it.count || it.findC, grand = !!it.grand, mark = LANDMARK[target];
+  p.mode = 'findC';
+  p.target = target;
+  p.grand = grand;
+  p.clef = grand ? (target === 'C4' ? it.clef : target === 'G4' ? 't' : 'b') : it.clef;
+  p.tapped = [];
+  p.misses = 0;
+  const ok = x => x !== target && letterOf(stepOf(x)) !== letterOf(stepOf(target));
+  if (grand) {
+    // other notes spread over both staffs, each pitch only once
+    const pool = shuffle([...STAFF_WHITES.t.map(x => ['t', x]), ...STAFF_WHITES.b.map(x => ['b', x])].filter(([, x]) => ok(x)));
+    const others = [];
+    for (const [c, x] of pool) { if (others.length >= count - 1) break; if (!others.some(o => o[1] === x) && (others.length % 2 === 0 ? c === 't' : c === 'b' || pool.every(([cc]) => cc === 't'))) others.push([c, x]); }
+    for (const [c, x] of pool) { if (others.length >= count - 1) break; if (!others.some(o => o[1] === x)) others.push([c, x]); }
+    p.placed = shuffle([[p.clef, target], ...others]);
+    p.notes = p.placed.map(o => o[1]);
+    p.step = 'note';
+    p.prompt = target === 'C4' ? 'Tap Middle C.' : `Tap the ${mark.name} on the ${CLEF[p.clef].name} staff.`;
+  } else {
+    const near = [];
+    for (let s = stepOf(target) - 5; s <= stepOf(target) + 5; s++) { const x = pitchOf(s); if (ok(x) && Math.abs(whiteMidi(s) - midiOf(target)) <= 9) near.push(x); }
+    p.notes = count === 1 ? [target] : shuffle([target, pick(near)]);
+    p.step = 'clef';
+    p.prompt = 'Which clef is this?';
+    p.choices = [{ t: 'Treble clef', ok: p.clef === 't' }, { t: 'Bass clef', ok: p.clef === 'b' }];
+  }
+  p.answerText = () => mark.where(p.clef);
+}
+function findCStaff(p) {
+  const cls = x => p.step === 'clef' ? '' : x === p.target && p.done ? 'ok' : p.tapped.includes(x) ? 'try' : '';
+  if (p.grand) {
+    // one column per notehead across both staffs, like real piano music
+    const on = c => p.placed.map(o => o[0] === c ? { p: o[1], d: 'w', cls: cls(o[1]) } : { skip: 1, d: 'w' });
+    return grandSvg({ S: 17, width: 440, t: on('t'), b: on('b'), even: true, cl: 'findc-grand' });
+  }
+  const lo = p.clef === 't' ? stepOf('E3') : CLEF.b.bottom, hi = p.clef === 't' ? topOf('t') : stepOf('A4');
+  return staffSvg({ clef: p.clef, S: 22, width: 360, even: true, items: p.notes.map(x => ({ p: x, d: 'w', cls: cls(x) })),
+    lo, hi, label: `A ${CLEF[p.clef].name} staff with ${p.notes.length} notehead${p.notes.length > 1 ? 's' : ''}` });
+}
+function findCClef(idx) {
+  const p = sess.probs[sess.i], c = p.choices?.[idx];
+  if (!c || p.step !== 'clef' || p.wrong.includes(idx)) return;
+  if (!c.ok) {
+    p.wrong.push(idx); p.misses++;
+    p.lastWrong = `Not the ${c.t.toLowerCase()}. A treble clef curls around the G line. A bass clef has two dots around the F line.`;
+    if (p.wrong.length < 2) return render(true);
+  }
+  p.clefLine = c.ok ? `Yes, the ${CLEF[p.clef].name} clef.` : `It is the ${CLEF[p.clef].name} clef.`;
+  p.lastWrong = null;
+  p.step = 'note';
+  p.prompt = LANDMARK[p.target].ask();
+  render();
+}
+function findCTap(pitch) {
+  const p = sess.probs[sess.i];
+  if (p.step !== 'note' || p.done) return;
+  if (pitch === p.target) {
+    p.done = true; p.result = p.misses === 0;
+    p.praise = p.misses === 0 ? pick(PRAISE) : 'There it is.';
+    tell(p, `${p.praise} ${p.answerText()}`);
+    record(p, p.misses === 0);
+    return render();
+  }
+  if (p.tapped.includes(pitch)) return;
+  p.tapped.push(pitch); p.misses++;
+  p.lastWrong = `That one is ${letterOf(stepOf(pitch))}. ${p.answerText()}`;
+  render(true);
+}
+// Staff basics: the staff, higher and lower, the musical alphabet, the clefs and the grand staff.
+const ORDINAL = ['', '1st', '2nd', '3rd', '4th', '5th'];
+const plainStaff = (items, o = {}) => staffSvg({ clef: 't', S: o.S || 18, width: o.width || 340, noClef: !o.clef, even: true, lo: stepOf('C4'), hi: stepOf('A5'), items, cl: 'basic' });
+const clefOnly = (c, items = []) => staffSvg({ clef: c, S: 18, width: 300, items, noteX: 220, lo: c === 't' ? stepOf('C4') : stepOf('E2'), hi: c === 't' ? stepOf('A5') : stepOf('C4') });
+function basicProblem(p, it) {
+  p.mode = 'choice';
+  const kind = it.basic, E4 = stepOf('E4');
+  const two = (a, b) => [{ t: a[0], ok: a[1] }, { t: b[0], ok: b[1] }];
+  if (kind === 'lineSpace') {
+    const s = E4 + Math.floor(rng() * 9), line = (s - E4) % 2 === 0;
+    p.vis = plainStaff([{ p: pitchOf(s), d: 'w' }]);
+    p.prompt = 'Is this note on a line or in a space?';
+    p.choices = two(['On a line', line], ['In a space', !line]);
+    p.answerText = () => line ? 'A line goes right through its middle: it is on a line.' : 'It sits between two lines: it is in a space.';
+  } else if (kind === 'whichLine' || kind === 'whichSpace') {
+    const line = kind === 'whichLine', k = 1 + Math.floor(rng() * (line ? 5 : 4)), s = E4 + (line ? (k - 1) * 2 : k * 2 - 1);
+    p.vis = plainStaff([{ p: pitchOf(s), d: 'w' }]);
+    p.prompt = `Which ${line ? 'line is this note on' : 'space is this note in'}? Count up from the bottom.`;
+    p.layout = 'nums';
+    p.choices = Array.from({ length: line ? 5 : 4 }, (_, i) => ({ t: `${ORDINAL[i + 1]} ${line ? 'line' : 'space'}`, ok: i + 1 === k }));
+    p.answerText = () => `It is ${line ? 'on' : 'in'} the ${ORDINAL[k]} ${line ? 'line' : 'space'}, counting up from the bottom.`;
+  } else if (kind === 'higher' || kind === 'lower') {
+    const a = E4 - 1 + Math.floor(rng() * 10);
+    let b = a;
+    while (Math.abs(b - a) < 2) b = E4 - 1 + Math.floor(rng() * 10);
+    const want = kind === 'higher' ? Math.max(a, b) : Math.min(a, b);
+    p.vis = plainStaff([{ p: pitchOf(a), d: 'w' }, { p: pitchOf(b), d: 'w' }]);
+    p.prompt = `Which note is ${kind}?`;
+    p.choices = two(['The first note', a === want], ['The second note', b === want]);
+    p.hear = [{ midi: whiteMidi(a), beats: 1 }, { midi: whiteMidi(b), beats: 1 }];
+    p.answerText = () => `The ${a === want ? 'first' : 'second'} note sits ${kind} on the staff, so it sounds ${kind}.`;
+  } else if (kind === 'next' || kind === 'before') {
+    const i = Math.floor(rng() * 7), l = LETTERS[(i + 5) % 7], ans = LETTERS[(i + 5 + (kind === 'next' ? 1 : -1) + 7) % 7];
+    p.prompt = `Which letter comes ${kind === 'next' ? 'after' : 'before'} ${l}?`;
+    p.layout = 'letters';
+    p.choices = LETTER_CHOICES().map(x => ({ t: x, ok: x === ans }));
+    p.answerText = () => kind === 'next' ? `${l}, then ${ans}.${l === 'G' ? ' After G, the letters start again at A.' : ''}` : `${ans}, then ${l}.${l === 'A' ? ' Before A comes G: the letters go round.' : ''}`;
+  } else if (kind === 'stepUp') {
+    const s = E4 - 2 + Math.floor(rng() * 9), up = rng() < .6, t = s + (up ? 1 : -1);
+    p.vis = staffSvg({ clef: 't', S: 18, width: 340, even: true, lo: stepOf('C4'), hi: stepOf('A5'), items: [{ p: pitchOf(s), d: 'w' }, { p: pitchOf(t), d: 'w', cls: 'now' }],
+      extra: ({ x, Y, S }) => `<text class="walk final" x="${x[0]}" y="${Y(Math.min(s, t)) + S * 2.2}" text-anchor="middle" font-size="${S * 1.2}">${letterOf(s)}</text>` });
+    p.prompt = `The first note is ${letterOf(s)}. The blue note is one step ${up ? 'up' : 'down'}. What is it?`;
+    p.layout = 'letters';
+    p.choices = LETTER_CHOICES().map(x => ({ t: x, ok: x === letterOf(t) }));
+    p.hearP = pitchOf(t);
+    p.answerText = () => `One step ${up ? 'up' : 'down'} from ${letterOf(s)} is ${letterOf(t)}.`;
+  } else if (kind === 'trebleName' || kind === 'bassName') {
+    const c = kind === 'trebleName' ? 't' : 'b';
+    p.vis = clefOnly(c);
+    p.prompt = 'What is this clef called?';
+    p.choices = two(['Treble clef', c === 't'], ['Bass clef', c === 'b']);
+    p.answerText = () => c === 't' ? 'The treble clef, also called the G clef.' : 'The bass clef, also called the F clef.';
+  } else if (kind === 'trebleLine' || kind === 'bassLine') {
+    const c = kind === 'trebleLine' ? 't' : 'b', ans = c === 't' ? 2 : 4;
+    p.vis = clefOnly(c);
+    p.prompt = c === 't' ? 'The treble clef curls around one line. Which line?' : 'The two dots of the bass clef sit on either side of one line. Which line?';
+    p.layout = 'nums';
+    p.choices = [1, 2, 3, 4, 5].map(k => ({ t: `${ORDINAL[k]} line`, ok: k === ans }));
+    p.answerText = () => c === 't' ? 'The 2nd line, counting up from the bottom. That line is G.' : 'The 4th line, counting up from the bottom. That line is F.';
+  } else if (kind === 'trebleG' || kind === 'bassF') {
+    const c = kind === 'trebleG' ? 't' : 'b', note = c === 't' ? 'G4' : 'F3';
+    p.vis = clefOnly(c, [{ p: note, d: 'w' }]);
+    p.prompt = c === 't' ? 'This note is on the line the treble clef curls around. What note is it?' : 'This note is on the line between the bass clef’s dots. What note is it?';
+    p.layout = 'letters';
+    p.choices = LETTER_CHOICES().map(x => ({ t: x, ok: x === note[0] }));
+    p.hearP = note;
+    p.answerText = () => c === 't' ? 'G. That is why the treble clef is called the G clef.' : 'F. That is why the bass clef is called the F clef.';
+  } else if (kind === 'whichClef' || kind === 'whichHand') {
+    const c = rng() < .5 ? 't' : 'b', notes = Array.from({ length: 3 }, () => pitchOf(CLEF[c].bottom + Math.floor(rng() * 9)));
+    p.vis = staffSvg({ clef: c, S: 16, width: 340, even: true, items: notes.map(x => ({ p: x, d: 'q' })) });
+    if (kind === 'whichClef') {
+      p.prompt = 'What clef is this?';
+      p.choices = two(['Treble clef', c === 't'], ['Bass clef', c === 'b']);
+      p.answerText = () => c === 't' ? 'A treble clef: it curls around the G line.' : 'A bass clef: its two dots sit around the F line.';
+    } else {
+      p.prompt = 'Which hand usually plays the notes on this staff?';
+      p.choices = two(['Right hand', c === 't'], ['Left hand', c === 'b']);
+      p.answerText = () => c === 't' ? 'This is a treble staff, usually played with the right hand.' : 'This is a bass staff, usually played with the left hand.';
+    }
+  } else if (kind === 'grandTop') {
+    const treble = rng() < .5;
+    p.vis = grandSvg({ S: 13, width: 340 });
+    p.prompt = `On the grand staff, which one is the ${treble ? 'treble' : 'bass'} staff?`;
+    p.choices = two(['The top staff', treble], ['The bottom staff', !treble]);
+    p.answerText = () => 'The treble staff is on top and the bass staff is below.';
+  } else if (kind === 'grandWhich') {
+    const c = rng() < .5 ? 't' : 'b', note = pitchOf(CLEF[c].bottom + Math.floor(rng() * 9)), it2 = [{ p: note, d: 'w', cls: 'now' }];
+    p.vis = grandSvg({ S: 13, width: 340, t: c === 't' ? it2 : [], b: c === 'b' ? it2 : [] });
+    p.prompt = 'Is the blue note on the treble staff or the bass staff?';
+    p.choices = two(['Treble staff', c === 't'], ['Bass staff', c === 'b']);
+    p.hearP = note;
+    p.answerText = () => c === 't' ? 'It is on the top staff, the treble staff.' : 'It is on the bottom staff, the bass staff.';
+  } else {
+    const c = rng() < .5 ? 't' : 'b', it2 = [{ p: 'C4', d: 'w', cls: 'now' }];
+    p.vis = grandSvg({ S: 13, width: 340, t: c === 't' ? it2 : [], b: c === 'b' ? it2 : [] });
+    p.prompt = 'This blue note sits between the two staffs. What is it?';
+    p.choices = [['Middle C', true], ['The G line', false], ['The F line', false]].map(([t, ok]) => ({ t, ok }));
+    p.hearP = 'C4';
+    p.answerText = () => `Middle C, on its own ledger line ${c === 't' ? 'just below the treble staff' : 'just above the bass staff'}.`;
+  }
 }
 function twinProblem(p, it) {
   const from = pick(['t', 'b']), to = from === 't' ? 'b' : 't', s = stepOf(it.p);
@@ -742,6 +931,10 @@ function earProblem(p, it) {
 }
 
 /* ---------- building a round ---------- */
+// The first steps go in order: Staff basics, Finding Middle C, Finding the Clef Notes, then Out from Middle C.
+// A step waits while an earlier one is switched on and not yet finished.
+const COMES_AFTER = { findc: ['basics'], clefnotes: ['basics', 'findc'], path: ['basics', 'findc', 'clefnotes'] };
+const waitingFor = k => (COMES_AFTER[k] || []).find(x => state.on[x] && !state.mastered[x]);
 const MAX_NEW = 4, MAX_CHAPTERS = 2;
 function dueCards() {
   const now = Date.now();
@@ -760,7 +953,8 @@ function introFor(it) {
 }
 function buildSession() {
   let on = ORDER.filter(k => state.on[k]);
-  if (!on.length) on = ['path'];
+  on = on.filter(k => !waitingFor(k));
+  if (!on.length) on = [['basics', 'findc', 'clefnotes', 'path'].find(k => !waitingFor(k))];
   // At most two new chapters a round; a topic with a third waits for the next round.
   const unread = on.filter(k => !state.chapters[chapterKey(k, levelNow(k))]);
   const held = new Set(unread.slice(MAX_CHAPTERS));
@@ -882,6 +1076,7 @@ function missed(p, wrongLine) {
 }
 function answer(idx) {
   const p = sess.probs[sess.i];
+  if (p.mode === 'findC') return findCClef(idx);
   if (p.done || p.wrong.includes(idx) || !p.choices[idx]) return;
   const c = p.choices[idx];
   if (c.ok) { gotIt(p); render(); return; }
@@ -1113,9 +1308,9 @@ function renderHome() {
   const caught = knownNotes().size, total = ORDER.flatMap(k => allItems(k)).filter(i => i.note && !i.keyOnly).length;
   const today = new Date().toDateString();
   const todayCount = state.sessions.filter(s => new Date(s.d).toDateString() === today).reduce((t, s) => t + s.n, 0);
-  const chip = k => `<button class="chip ${TOPIC[k].star ? 'star-chip' : ''}" data-act="chip" data-k="${k}" aria-pressed="${!!state.on[k]}"><strong>${esc(TOPIC[k].name)}</strong><small>${esc(TOPIC[k].note)} · level ${levelNow(k)}</small>${levelBar(k)}</button>`;
+  const chip = k => `<button class="chip ${TOPIC[k].star ? 'star-chip' : ''}" data-act="chip" data-k="${k}" aria-pressed="${!!state.on[k]}"><strong>${esc(TOPIC[k].name)}</strong><small>${waitingFor(k) ? `Starts after ${esc(TOPIC[waitingFor(k)].name)}` : `${esc(TOPIC[k].note)} · level ${levelNow(k)}`}</small>${levelBar(k)}</button>`;
   return `
-  <header class="top"><h1>${esc(greet('Hello'))}</h1><button class="link" data-act="parent">For grown-ups</button></header>
+  <header class="top"><div class="app-name"><h1>Note Beast</h1><p class="hello">${esc(greet('Hello'))}</p></div><button class="link" data-act="parent">For grown-ups</button></header>
   <section>
     <div class="goal-head"><h2>Notes learned</h2><span class="count">${caught} of ${total}</span></div>
     ${hunterMap()}
@@ -1124,12 +1319,28 @@ function renderHome() {
     <h2>What are we practicing?</h2>
     <div class="chips">${ORDER.map(chip).join('')}</div>
   </section>
-  <button class="start" data-act="start">Start <small>${state.perSession} questions</small></button>
+  <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section>
     <h2>Songs to play</h2>
     <div class="songs">${SONGS.map(s => { const r = state.songs[s.id]; return `<button class="song-btn" data-act="song" data-id="${s.id}">${r ? starSvg(r.best === 0) : starSvg(false)}<span><strong>${esc(s.name)}</strong><small>${esc(s.tag)}</small></span></button>`; }).join('')}</div>
   </section>
   <p class="meta">${todayCount ? `${todayCount} questions so far today. ` : ''}${state.total} answered since the start.</p>`;
+}
+// The Note Map: every note the app teaches, named, on both staffs. Tap a note to hear it.
+function renderMap() {
+  const row = (c, lo, hi) => {
+    const items = [];
+    for (let s = stepOf(lo); s <= stepOf(hi); s++) items.push({ p: pitchOf(s), d: 'w', cls: pitchOf(s) === 'C4' ? 'now' : '' });
+    const low = Math.min(...items.map(i => stepOf(i.p)));
+    return staffSvg({ clef: c, S: 15, width: 880, even: true, items, cl: 'map-staff',
+      extra: ({ x, Y, S }) => items.map((it, i) => `<text class="map-l ${it.p === 'C4' ? 'mid' : ''}" x="${x[i]}" y="${Y(low) + S * 2.1}" text-anchor="middle" font-size="${S * 1.05}">${letterOf(stepOf(it.p))}</text>`).join('') });
+  };
+  return `<header class="top"><h1>Note map</h1><button class="ghost" data-act="home">Back</button></header>
+  <p class="note">Every note, named. The blue note is Middle C. Tap any note to hear it.</p>
+  <section><h2>Treble clef</h2><div class="map-scroll">${row('t', 'F3', 'E6')}</div></section>
+  <section><h2>Bass clef</h2><div class="map-scroll">${row('b', 'A1', 'G4')}</div></section>
+  <section><h2>The two staffs together</h2><div class="staff-wrap">${grandSvg({ S: 14, width: 420, t: [{ p: 'C4', d: 'w', cls: 'now' }, { p: 'G4', d: 'w' }], b: [{ p: 'F3', d: 'w' }, { p: 'C4', d: 'w', cls: 'now' }] })}</div>
+  <p class="note">Treble G sits on the line the treble clef curls around. Bass F sits on the line between the bass clef’s dots. Middle C can be written just below the treble staff or just above the bass staff: the same key either way.</p></section>`;
 }
 function promptRow(text) {
   return `<div class="prompt-row"><span class="prompt">${esc(text)}</span>${canSpeak ? `<button class="say" data-act="say" aria-label="Read it aloud">${speakerIcon}</button>` : ''}</div>`;
@@ -1200,9 +1411,31 @@ function feedbackHtml(p) {
   if (p.tries) return `<span class="big try">${esc(p.lastWrong)}</span><span class="how">${p.clef && p.item.note ? esc(hintWords(p.clef, stepOf(p.p))) : 'Try again.'}</span>`;
   return '';
 }
+function basicShow(kind) {
+  const E4 = stepOf('E4');
+  if (kind === 'staff') {
+    // the staff with its lines and spaces named in two columns beside it, clear of the lines
+    const S = 18, part = staffSvg({ clef: 't', S, width: 230, noClef: true, lo: E4, hi: stepOf('F5'), items: [{ p: 'G4', d: 'w' }, { p: 'C5', d: 'w' }], even: true, parts: true });
+    const Y = st => part.yTop + (topOf('t') - st) * S / 2;
+    const names = [1, 2, 3, 4, 5].map(k => `<text class="map-l" x="246" y="${Y(E4 + (k - 1) * 2) + S * .3}" font-size="${S * .72}">${ORDINAL[k]} line</text>`).join('')
+      + [1, 2, 3, 4].map(k => `<text class="map-l space" x="330" y="${Y(E4 + k * 2 - 1) + S * .3}" font-size="${S * .72}">${ORDINAL[k]} space</text>`).join('');
+    return `<svg class="staff" viewBox="0 0 420 ${part.h}" role="img" aria-label="A staff with its five lines and four spaces numbered from the bottom">${part.inner}${names}</svg>`;
+  }
+  if (kind === 'highlow') return staffSvg({ clef: 't', S: 18, width: 340, noClef: true, even: true, lo: stepOf('C4'), hi: stepOf('A5'), items: [{ p: 'E4', d: 'w' }, { p: 'G5', d: 'w' }],
+    extra: ({ x, Y, S }) => `<text class="walk final" x="${x[0]}" y="${Y(stepOf('E4')) + S * 2.1}" text-anchor="middle" font-size="${S}">low</text><text class="walk final" x="${x[1]}" y="${Y(stepOf('G5')) - S * 1.1}" text-anchor="middle" font-size="${S}">high</text>` });
+  if (kind === 'alphabet') return pianoSvg({ from: stepOf('A3'), whites: 10, letters: 'all', star: false });
+  if (kind === 'landmarks') return `<div class="pair">${chapterLabelled('t', ['G4'])}${chapterLabelled('b', ['F3'])}</div>`;
+  if (kind === 'grandmarks') return grandSvg({ S: 15, width: 400, t: [{ p: 'C4', d: 'w' }, { p: 'G4', d: 'w' }], b: [{ p: 'F3', d: 'w' }, { p: 'C4', d: 'w' }] });
+  if (kind === 'treble') return chapterLabelled('t', ['G4']);
+  if (kind === 'bass') return chapterLabelled('b', ['F3']);
+  if (kind === 'clefs') return `<div class="pair">${staffSvg({ clef: 't', S: 14, width: 170 })}${staffSvg({ clef: 'b', S: 14, width: 170 })}</div>`;
+  return grandSvg({ S: 14, width: 360, t: [{ p: 'C4', d: 'w' }], b: [{ p: 'C4', d: 'w' }] });
+}
+const chapterLabelled = (clef, ps) => staffSvg({ clef, S: 16, width: 300, items: ps.map(x => ({ p: x, d: 'w' })), noteX: 210, extra: ({ x, Y, S }) => ps.map((pp, i) => `<text class="walk final" x="${x[i] + S * 1.6}" y="${Y(stepOf(pp)) + S * .4}" font-size="${S * 1.15}">${letterOf(stepOf(pp))}</text>`).join('') });
 function chapterShow(c) {
   const s = c.show || {};
   const labelled = (clef, ps) => staffSvg({ clef, S: 13, width: 340, items: ps.map(x => ({ p: x, d: 'w', acc: parseP(x).acc || undefined })), extra: ({ x, Y, S }) => ps.map((pp, i) => `<text class="walk final" x="${x[i]}" y="${stepOf(pp) >= CLEF[clef].bottom + 4 ? Y(stepOf(pp)) - S * 1.1 - (ledgersFor(clef, stepOf(pp)) ? 0 : 0) : Y(stepOf(pp)) + S * 1.9}" text-anchor="middle" font-size="${S * 1.15}">${prettySym(pp)}</text>`).join('') });
+  if (s.basic) return basicShow(s.basic);
   if (s.pair) {
     const pairLo = Math.min(stepOf(s.pair[0]), CLEF.t.bottom) - 1, pairHi = Math.max(stepOf(s.pair[1]), topOf('b')) + 1;
     return `<div class="pair">${staffSvg({ clef: 't', S: 12, width: 170, lo: pairLo, items: [{ p: s.pair[0], d: 'w' }] })}${staffSvg({ clef: 'b', S: 12, width: 170, hi: pairHi, items: [{ p: s.pair[1], d: 'w' }] })}</div>`;
@@ -1246,6 +1479,13 @@ function renderPlay() {
   }
   let body = '', controls = '';
   const isNoteStaff = p.item.note && (p.mode === 'choice' || p.mode === 'key' || p.mode === 'real');
+  if (p.mode === 'findC') {
+    const clefDone = p.step === 'note';
+    return `${head}<div class="problem" id="problem">${promptRow(p.prompt)}<div class="staff-wrap findc-wrap">${findCStaff(p)}</div></div>
+    ${clefDone ? '' : choicesHtml(p).replace('class="choices words"', 'class="choices nums"')}
+    <div class="feedback">${clefDone && p.clefLine ? `<span class="how">${esc(p.clefLine)}</span>` : ''}${p.done ? `<span class="big ${p.revealed ? 'try' : 'good'}">${esc(p.revealed ? 'Middle C is the green note.' : p.praise)}</span><span class="how">${esc(p.answerText())}</span>` : p.lastWrong ? `<span class="how try-line">${esc(p.lastWrong)}</span>` : clefDone ? '<span class="how">Every notehead plays its sound when you touch it.</span>' : ''}</div>
+    ${p.done ? `<div class="next-row"><button class="start" data-act="next" id="next">${last ? 'My stars' : 'Next'}</button></div>` : ''}${foot}`;
+  }
   if (p.mode === 'row') {
     return `${head}<div class="problem" id="problem">${promptRow(p.prompt)}<div class="staff-wrap row-wrap">${rowStaff(p)}</div></div>${rowButtons(p)}
     <div class="feedback">${p.done ? `<span class="big ${p.misses ? 'try' : 'good'}">${esc(p.praise)}</span>${p.lastWrong ? `<span class="how">${esc(p.lastWrong)}</span>` : ''}` : p.lastWrong ? `<span class="how try-line">${esc(p.lastWrong)}</span>` : ''}</div>
@@ -1289,7 +1529,7 @@ function renderDone() {
   const pct = n ? score / n : 0, tier = pct >= .9 ? 0 : pct >= .7 ? 1 : pct >= .4 ? 2 : 3;
   if (!sess.cheer) sess.cheer = pick(CHEERS[tier]);
   const ups = lastChanges.filter(c => c[1] === 'up');
-  return `<h1>${esc(greet(sess.cheer.head))}</h1>
+  return `<div class="done-top"><div><h1>${esc(greet(sess.cheer.head))}</h1></div><div class="done-beast"></div></div>
   <p class="story left">${esc(sess.cheer.line)}</p>
   <p class="meta">${score} of ${n} all right on the first try.${sess.learned.length ? ` ${sess.learned.length} newly learned.` : ''}</p>
   <div class="stars">${sess.results.map(starSvg).join('')}</div>
@@ -1400,9 +1640,41 @@ function render(shake) {
   const lines = document.querySelector('.song-lines'), wasAt = lines ? lines.scrollTop : 0;
   // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
   document.body.classList.toggle('song-mode', screen === 'song');
-  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : renderHome();
+  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
+  if (screen === 'play' || screen === 'done') showBeast();
+}
+// The Note Beast appears beside the feedback once there's an answer: delighted when it's right, concerned when it isn't.
+let beastShown = '', beastLine = '';
+function beastMood() {
+  if (screen === 'done') return sess.results.filter(Boolean).length >= sess.results.length * .7 ? 'happy' : 'worried';
+  const p = sess.probs[sess.i];
+  if (!p || p.mode === 'chapter' || p.mode === 'intro') return '';
+  if (p.done) return p.revealed || (p.mode === 'row' && p.notes.some(n => n.state === 'shown')) ? 'worried' : 'happy';
+  if (p.lastWrong || p.tries > 0) return 'worried';
+  // a right answer partway through counts too: the clef named, or a note of a row
+  if ((p.mode === 'findC' && p.step === 'note') || (p.mode === 'row' && p.at > 0)) return 'happy';
+  return '';
+}
+function showBeast() {
+  const mood = beastMood(), spot = document.querySelector(screen === 'done' ? '.done-beast' : '.feedback');
+  if (!mood || !spot) { beastShown = ''; return; }
+  // he pops in when his face changes, not on every redraw
+  const q = sess.probs[sess.i];
+  const key = `${screen}:${sess.i}:${mood}:${q?.tries || 0}:${q?.misses || 0}:${q?.at || 0}:${q?.step || ''}:${q?.done ? 1 : 0}`;
+  const fresh = key !== beastShown;
+  beastShown = key;
+  // a new line only when his face changes, so redrawing the screen doesn't change what he says
+  if (fresh) beastLine = pick(BEAST_SAYS[screen === 'done' ? (mood === 'happy' ? 'doneHappy' : 'doneWorried') : mood]);
+  if (screen === 'play') {
+    const text = document.createElement('div');
+    text.className = 'fb-text';
+    while (spot.firstChild) text.appendChild(spot.firstChild);
+    spot.appendChild(text);
+    spot.classList.add('with-beast');
+  }
+  spot.insertAdjacentHTML('beforeend', `<div class="beast ${mood} ${fresh ? 'pop' : ''}"><p class="beast-says">${esc(beastLine)}</p>${beastSvg(mood)}</div>`);
 }
 let songGlide = 0;
 // Keeps the line being played at the top of the music, with the next line showing below it.
@@ -1453,6 +1725,7 @@ const ACTIONS = {
   'said-yes'() { selfCheck(true); },
   'said-no'() { selfCheck(false); },
   song(d) { openSong(d.id); window.scrollTo?.({ top: 0 }); },
+  map() { audioReady(); screen = 'map'; render(); window.scrollTo?.({ top: 0 }); },
   'song-hear'() { hearSong(); },
   'song-letters'() { song.letters = !song.letters; render(); },
   'song-restart'() { hush(); song.i = 0; song.misses = 0; song.flash = null; song.playing = -1; render(); },
@@ -1490,7 +1763,11 @@ app.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act]');
   // a note on a staff plays when tapped, unless the whole staff is itself an answer button
   const note = !b && e.target.closest?.('[data-play]');
-  if (note) { audioReady(); playP(note.dataset.play, 1.2); return; }
+  if (note) {
+    audioReady(); playP(note.dataset.play, 1.2);
+    if (screen === 'play' && sess?.probs[sess.i]?.mode === 'findC') findCTap(note.dataset.play);
+    return;
+  }
   if (!b || b.disabled) return;
   audioReady();
   ACTIONS[b.dataset.act]?.(b.dataset);

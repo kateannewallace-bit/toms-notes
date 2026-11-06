@@ -1,4 +1,4 @@
-# Tom's Note Hunt
+# Note Beast
 
 A PWA that teaches reading music in black-on-white engraved notation, built from the Tom's Chalkboard template. Note reading starts at Middle C on both clefs and builds out one letter at a time, with hints that always count from a C. The other topics cover finding notes on the piano, rhythm, bars, sharps and flats, music signs and listening, with songs to play.
 
