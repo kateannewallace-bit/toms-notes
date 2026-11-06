@@ -115,6 +115,7 @@ function challengeKey(midi) {
     updateHud();
     game.mood = 'happy'; game.pose = 'thumbs';
     setPhase('fly');
+    showCaughtName();
     grunt('happy', hearing() ? 0 : .8);
     return;
   }
@@ -125,6 +126,21 @@ function challengeKey(midi) {
   loseHorn();
   if (game.over) return;
   setPhase('scowl');
+}
+// The note's name bursts up beside him as he flies away.
+function showCaughtName() {
+  const el = document.getElementById('caught-name');
+  if (!el) return;
+  const p = game.target[1];
+  el.textContent = p === 'C4' ? 'Middle C!' : `${letterOf(stepOf(p))}!`;
+  // just past his sign on the right, or on the left if there's no room
+  // measured from the sign itself: his drawing's box is wider than what you see
+  const stage = document.getElementById('stage').getBoundingClientRect(), him = (document.querySelector('#runner .beast-figure > rect') || document.getElementById('runner')).getBoundingClientRect();
+  el.classList.remove('show', 'left');
+  el.style.left = `${him.right - stage.left + 8}px`;
+  if (him.right - stage.left + 8 + el.offsetWidth > stage.width) { el.style.left = `${him.left - stage.left - 8}px`; el.classList.add('left'); }
+  void el.offsetWidth;  // restart the animation
+  el.classList.add('show');
 }
 function finishChallenge(result) {
   cancelAnimationFrame(game.raf);
@@ -143,7 +159,7 @@ function renderChallenge() {
     ? `<div class="game-over won"><div class="beast won">${beastSvg('happy')}</div><h1>You beat the Note Beast Challenge!</h1><p class="beast-says">${esc(pick(BEAST_SAYS.doneHappy))}</p><div class="row-btns"><button class="start" data-act="challenge">Play again</button><button class="ghost" data-act="home">Home</button></div></div>`
     : `<div class="game-over lost"><div class="beast">${beastSvg('worried')}</div><h1>TRY AGAIN</h1><p class="meta">You caught ${game.caught} of ${CHALLENGE_GOAL}.</p><div class="row-btns"><button class="start" data-act="challenge">Try again</button><button class="ghost" data-act="home">Home</button></div></div>`;
   return `<header class="top game-top"><span class="caught-label">Level ${challengeLevel()} · Caught <strong id="caught">${game.caught} of ${CHALLENGE_GOAL}</strong></span><span id="lives" class="lives" role="img" aria-label="${game.lives} of ${CHALLENGE_LIVES} lives left">${hornsHtml()}</span></header>
-  <div class="stage" id="stage"><div class="runner" id="runner"></div>${panel}</div>
+  <div class="stage" id="stage"><div class="runner" id="runner"></div><div class="caught-name" id="caught-name" aria-live="polite"></div>${panel}</div>
   <div class="game-keys ${hearing() ? 'listening' : ''}">${hearing() ? listenPanel('Listening. Play the note on your piano.') : keys}</div>
   <button class="link" data-act="home" style="align-self:flex-start">Stop and go home</button>`;
 }

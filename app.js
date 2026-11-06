@@ -1486,7 +1486,8 @@ function renderPlay() {
   const isNoteStaff = p.item.note && (p.mode === 'choice' || p.mode === 'key' || p.mode === 'real');
   if (p.mode === 'findC') {
     const clefDone = p.step === 'note';
-    return `${head}<div class="problem" id="problem">${promptRow(p.prompt)}<div class="staff-wrap findc-wrap">${findCStaff(p)}</div></div>
+    // the question sits under the staff, apart from the Note Beast's words lower down
+    return `${head}<div class="problem" id="problem"><div class="staff-wrap findc-wrap">${findCStaff(p)}</div>${promptRow(p.prompt)}</div>
     ${clefDone ? '' : choicesHtml(p).replace('class="choices words"', 'class="choices nums"')}
     <div class="feedback">${clefDone && p.clefLine ? `<span class="how">${esc(p.clefLine)}</span>` : ''}${p.done ? `<span class="big ${p.revealed ? 'try' : 'good'}">${esc(p.revealed ? 'Middle C is the green note.' : p.praise)}</span><span class="how">${esc(p.answerText())}</span>` : p.lastWrong ? `<span class="how try-line">${esc(p.lastWrong)}</span>` : clefDone ? '<span class="how">Every notehead plays its sound when you touch it.</span>' : ''}</div>
     ${p.done ? `<div class="next-row"><button class="start" data-act="next" id="next">${last ? 'My stars' : 'Next'}</button></div>` : ''}${foot}`;
