@@ -1626,7 +1626,7 @@ function renderParent() {
     <div class="row-btns">${confirmWipe ? `<button class="ghost danger" data-act="wipe-yes">Yes, erase all progress</button><button class="link" data-act="wipe-no">Cancel</button>` : `<button class="ghost danger" data-act="wipe">Reset all progress</button>`}</div>
   </section>
   ${renderSync()}
-  <p class="note">Piano sound: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano V3</a> by Alexander Holm, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, converted to shorter MP3 files. Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
+  <p class="note">Piano sound: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano V3</a> by Alexander Holm, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, converted to shorter MP3 files. Note Beast’s happy grunt is a real bull, from <a href="https://freesound.org/people/JakobGille/sounds/610801/" target="_blank" rel="noopener">a recording by JakobGille</a> on Freesound (CC0). Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
 }
 function renderSync() {
   if (!syncAvailable) return '<p class="note">Progress is saved on this device.</p>';

@@ -268,6 +268,7 @@ function audioReady() {
     actx = new AC();
     masterGain = actx.createGain(); masterGain.gain.value = 0.7; masterGain.connect(actx.destination);
     loadPiano(actx);
+    loadBull(actx);
   }
   // an iPad can leave sound 'interrupted', not just suspended, after the microphone starts
   if (actx.state !== 'running') actx.resume();
@@ -311,12 +312,26 @@ function tone(midi, when = 0, dur = 0.9, vol = 0.6) {
   });
   if (liveNodes.length > 200) liveNodes = liveNodes.slice(-100);
 }
-// A bull's grunt, made from a low buzzy voice through a muffling filter, with a puff of breath.
-// 'happy': two quick grunts rising, hm-HM! 'sad': one long, sinking groan. It plays alongside other sounds and never stops them.
+// The happy grunt is a real bull: the start of an aggressive call (Freesound 610801 by JakobGille, CC0), loaded with the piano.
+let bullGrunt = null;
+function loadBull(a) {
+  fetch('sounds/bull-grunt.m4a').then(r => r.arrayBuffer()).then(d => new Promise((ok, no) => a.decodeAudioData(d, ok, no))).then(b => { bullGrunt = b; }).catch(() => {});
+}
+// 'happy': the bull recording (or, until it loads, two quick made-up grunts rising, hm-HM!).
+// 'sad': a made-up grunt, one long sinking groan, from a low buzzy voice through a muffling filter with a puff of breath.
+// Either plays alongside other sounds and never stops them.
 function grunt(kind, when = 0) {
   const a = audioReady();
   if (!a) return;
   const happy = kind === 'happy';
+  if (happy && bullGrunt) {
+    const t0 = a.currentTime + when + .01, src = a.createBufferSource(), g = a.createGain();
+    src.buffer = bullGrunt; g.gain.value = 1.1;
+    src.connect(g); g.connect(masterGain); src.start(t0);
+    liveNodes.push(src);
+    soundingUntil = Math.max(soundingUntil, performance.now() + (when + bullGrunt.duration + .3) * 1000);
+    return;
+  }
   const parts = happy ? [[0, .16, 105, 128], [.2, .24, 120, 150]] : [[0, .75, 112, 70]];
   soundingUntil = Math.max(soundingUntil, performance.now() + (when + 1.2) * 1000);
   for (const [start, len, f0, f1] of parts) {
