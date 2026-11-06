@@ -1,4 +1,4 @@
-/* The Note Beast: a friendly, hairy minotaur. Faces: 'happy', 'worried', 'scowl', 'aghast' and 'dizzy'. */
+/* The Note Beast: a friendly, hairy minotaur. Faces: 'happy', 'worried', 'scowl', 'aghast', 'sad' and 'dizzy'. */
 const BEAST_INK = '#2a1a10', BEAST_FUR = '#8a5a3b', BEAST_DARK = '#5b3922', BEAST_TAN = '#e2bf96', BEAST_HORN = '#f1e6c8';
 // His head, in a 200 × 210 box (no shoulders).
 function beastHead(mood) {
@@ -7,6 +7,7 @@ function beastHead(mood) {
     happy: '<path d="M66 80 Q79 70 92 79" /><path d="M134 80 Q121 70 108 79" />',
     worried: '<path d="M66 86 L92 76" /><path d="M134 86 L108 76" />',
     scowl: '<path d="M64 76 L93 88" /><path d="M136 76 L107 88" />',
+    sad: '<path d="M66 88 L92 80" /><path d="M134 88 L108 80" />',
     aghast: '<path d="M62 78 L93 89" /><path d="M138 78 L107 89" /><path d="M97 80 L97 90 M103 80 L103 90" stroke-width="2.5" />',
     dizzy: '<path d="M66 80 Q79 74 92 80" /><path d="M134 80 Q121 74 108 80" />',
   }[mood];
@@ -14,6 +15,8 @@ function beastHead(mood) {
     ? `<circle cx="80" cy="100" r="12" fill="#fff"/><circle cx="120" cy="100" r="12" fill="#fff"/><circle cx="81" cy="101" r="6" fill="${ink}"/><circle cx="119" cy="101" r="6" fill="${ink}"/><circle cx="83" cy="98" r="2.2" fill="#fff" stroke="none"/><circle cx="121" cy="98" r="2.2" fill="#fff" stroke="none"/>`
     : mood === 'dizzy'
     ? '<path d="M72 92 L88 108 M88 92 L72 108 M112 92 L128 108 M128 92 L112 108" fill="none" stroke-width="4"/>'
+    : mood === 'sad'
+    ? `<circle cx="80" cy="102" r="11" fill="#fff"/><circle cx="120" cy="102" r="11" fill="#fff"/><circle cx="80" cy="106" r="5" fill="${ink}"/><circle cx="120" cy="106" r="5" fill="${ink}"/><path d="M69 99 Q80 90 91 99 Z M109 99 Q120 90 131 99 Z" fill="${fur}" stroke-width="2.5"/>`
     : mood === 'aghast'
     ? `<circle cx="80" cy="103" r="13" fill="#fff"/><circle cx="120" cy="103" r="13" fill="#fff"/><circle cx="80" cy="104" r="4" fill="${ink}"/><circle cx="120" cy="104" r="4" fill="${ink}"/>`
     : mood === 'scowl'
@@ -23,6 +26,7 @@ function beastHead(mood) {
     happy: '<path d="M82 154 Q100 180 118 154 Z" fill="#7a2c2c"/><path d="M90 163 Q100 172 110 163 Q100 168 90 163 Z" fill="#e88a8a" stroke="none"/>',
     worried: '<path d="M86 167 Q100 156 114 167" fill="none"/>',
     scowl: '<path d="M82 170 Q100 152 118 170" fill="none" stroke-width="4.5"/>',
+    sad: '<path d="M86 168 Q100 158 114 168" fill="none"/>',
     aghast: '<path d="M78 172 Q80 152 100 154 Q120 152 122 172 Q100 166 78 172 Z" fill="#7a2c2c"/><path d="M84 158 Q100 154 116 158 L115 163 Q100 160 85 163 Z" fill="#fff" stroke-width="2"/>',
     dizzy: '<path d="M82 164 q9 -9 18 0 q9 9 18 0" fill="none"/>',
   }[mood];
@@ -30,6 +34,7 @@ function beastHead(mood) {
     happy: '<circle cx="61" cy="126" r="8" fill="#f0a49a" opacity=".75" stroke="none"/><circle cx="139" cy="126" r="8" fill="#f0a49a" opacity=".75" stroke="none"/>',
     worried: '<path d="M151 70 Q156 80 151 85 Q146 80 151 70 Z" fill="#9fcbe9" stroke-width="2"/>',
     aghast: '',
+    sad: '<path d="M134 112 Q139 122 134 127 Q129 122 134 112 Z" fill="#9fcbe9" stroke-width="2"/>',
     scowl: '<circle cx="61" cy="126" r="9" fill="#d9534f" opacity=".45" stroke="none"/><circle cx="139" cy="126" r="9" fill="#d9534f" opacity=".45" stroke="none"/><path d="M34 44 q-9 -9 0 -18 q9 -9 0 -18 M166 44 q9 -9 0 -18 q-9 -9 0 -18" fill="none" stroke="#9aa3a8" stroke-width="4"/>',
     dizzy: '<path d="M60 24 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1 Z M140 18 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1 Z" fill="#f3d77a" stroke-width="2"/>',
   }[mood];
@@ -52,25 +57,33 @@ function beastHead(mood) {
     ${mouth}
   </g>`;
 }
+// A golden laurel wreath round his brow, like a Greek champion's, for winning the Challenge.
+const beastLaurel = () => `<g class="laurel" fill="#f3c94a" stroke="${BEAST_INK}" stroke-width="2"><path d="M58 76 Q60 40 100 40 Q140 40 142 76" fill="none" stroke="#b8902a" stroke-width="3"/><ellipse cx="56.8" cy="68.3" rx="9" ry="4.2" transform="rotate(-102 56.8 68.3) translate(-5 0)"/><ellipse cx="56.8" cy="68.3" rx="9" ry="4.2" transform="rotate(-32 56.8 68.3) translate(5 0)"/><ellipse cx="54.5" cy="76.2" rx="9" ry="4.2" transform="rotate(-115 54.5 76.2) translate(-5 0)"/><ellipse cx="54.5" cy="76.2" rx="9" ry="4.2" transform="rotate(-45 54.5 76.2) translate(5 0)"/><ellipse cx="54.1" cy="79.7" rx="9" ry="4.2" transform="rotate(59 54.1 79.7) translate(-5 0)"/><ellipse cx="54.1" cy="79.7" rx="9" ry="4.2" transform="rotate(129 54.1 79.7) translate(5 0)"/><ellipse cx="55.6" cy="71.6" rx="9" ry="4.2" transform="rotate(72 55.6 71.6) translate(-5 0)"/><ellipse cx="55.6" cy="71.6" rx="9" ry="4.2" transform="rotate(142 55.6 71.6) translate(5 0)"/><ellipse cx="58.9" cy="64.0" rx="9" ry="4.2" transform="rotate(85 58.9 64.0) translate(-5 0)"/><ellipse cx="58.9" cy="64.0" rx="9" ry="4.2" transform="rotate(155 58.9 64.0) translate(5 0)"/><ellipse cx="63.9" cy="57.2" rx="9" ry="4.2" transform="rotate(97 63.9 57.2) translate(-5 0)"/><ellipse cx="63.9" cy="57.2" rx="9" ry="4.2" transform="rotate(167 63.9 57.2) translate(5 0)"/><ellipse cx="70.4" cy="51.4" rx="9" ry="4.2" transform="rotate(109 70.4 51.4) translate(-5 0)"/><ellipse cx="70.4" cy="51.4" rx="9" ry="4.2" transform="rotate(179 70.4 51.4) translate(5 0)"/><ellipse cx="143.2" cy="68.3" rx="9" ry="4.2" transform="rotate(32 143.2 68.3) translate(-5 0)"/><ellipse cx="143.2" cy="68.3" rx="9" ry="4.2" transform="rotate(102 143.2 68.3) translate(5 0)"/><ellipse cx="145.5" cy="76.2" rx="9" ry="4.2" transform="rotate(45 145.5 76.2) translate(-5 0)"/><ellipse cx="145.5" cy="76.2" rx="9" ry="4.2" transform="rotate(115 145.5 76.2) translate(5 0)"/><ellipse cx="145.9" cy="79.7" rx="9" ry="4.2" transform="rotate(-129 145.9 79.7) translate(-5 0)"/><ellipse cx="145.9" cy="79.7" rx="9" ry="4.2" transform="rotate(-59 145.9 79.7) translate(5 0)"/><ellipse cx="144.4" cy="71.6" rx="9" ry="4.2" transform="rotate(-142 144.4 71.6) translate(-5 0)"/><ellipse cx="144.4" cy="71.6" rx="9" ry="4.2" transform="rotate(-72 144.4 71.6) translate(5 0)"/><ellipse cx="141.1" cy="64.0" rx="9" ry="4.2" transform="rotate(-155 141.1 64.0) translate(-5 0)"/><ellipse cx="141.1" cy="64.0" rx="9" ry="4.2" transform="rotate(-85 141.1 64.0) translate(5 0)"/><ellipse cx="136.1" cy="57.2" rx="9" ry="4.2" transform="rotate(-167 136.1 57.2) translate(-5 0)"/><ellipse cx="136.1" cy="57.2" rx="9" ry="4.2" transform="rotate(-97 136.1 57.2) translate(5 0)"/><ellipse cx="129.6" cy="51.4" rx="9" ry="4.2" transform="rotate(-179 129.6 51.4) translate(-5 0)"/><ellipse cx="129.6" cy="51.4" rx="9" ry="4.2" transform="rotate(-109 129.6 51.4) translate(5 0)"/><circle cx="100" cy="40" r="4.5" fill="#d9534f"/></g>`;
+// A long, broken old column lying on its side, for him to sit on when he sulks (he lives in a labyrinth, after all).
+const beastColumn = () => `<g stroke="${BEAST_INK}" stroke-width="3.5" stroke-linejoin="round"><path d="M-30 336 L246 336 L238 350 L252 362 L240 376 L254 388 L246 400 L-30 400 Z" fill="#ece4d4"/><path d="M-30 349 H244 M-30 362 H248 M-30 375 H246 M-30 388 H250" stroke="#b7ab95" stroke-width="3"/><ellipse cx="-30" cy="368" rx="16" ry="32" fill="#f6f0e4"/><ellipse cx="-30" cy="368" rx="9" ry="20" fill="none" stroke="#b7ab95" stroke-width="2.5"/></g>`;
 // Head and shoulders, beside the answers.
-function beastSvg(mood) {
-  return `<svg class="beast-art" viewBox="0 0 200 210" role="img" aria-label="The Note Beast ${mood === 'happy' ? 'looks delighted' : 'looks concerned'}">
+function beastSvg(mood, opts = {}) {
+  return `<svg class="beast-art" viewBox="0 0 200 210" role="img" aria-label="The Note Beast ${mood === 'happy' ? 'looks delighted' : 'looks concerned'}${opts.laurel ? ', wearing a golden laurel wreath' : ''}">
   <path d="M24 210 L32 184 L42 192 L50 170 L62 184 L74 166 L86 180 L100 164 L114 180 L126 166 L138 184 L150 170 L158 192 L168 184 L176 210 Z" fill="${BEAST_DARK}" stroke="${BEAST_INK}" stroke-width="3.5" stroke-linejoin="round"/>
-  ${beastHead(mood)}
+  ${beastHead(mood)}${opts.laurel ? beastLaurel() : ''}
 </svg>`;
 }
 // The whole Note Beast, for the Challenge: a broad, shaggy minotaur holding the placard in front of his chest.
-// pose: 'hold' (both hands on the placard), 'thumbs' (one thumb up), 'heap' (collapsed, placard dropped).
+// pose: 'hold' (both hands on the placard), 'thumbs' (one thumb up), 'cheer' (both arms up), 'sit' (sitting down, sulking).
+// opts.laurel puts a golden laurel wreath on his head. Sitting, he sits on a broken column.
 // placard: the staff to show on it, as an <svg> string.
-function beastFigure(mood, pose, placard = '') {
+function beastFigure(mood, pose, placard = '', opts = {}) {
   const ink = BEAST_INK, fur = BEAST_FUR, dark = BEAST_DARK, tan = BEAST_TAN;
   const arm = (...pts) => { const d = 'M' + pts.join(' L'); return `<path d="${d}" fill="none" stroke="${ink}" stroke-width="27" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${fur}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`; };
   const fist = (x, y) => `<circle cx="${x}" cy="${y}" r="13" fill="${fur}" stroke="${ink}" stroke-width="3.5"/>`;
   const leg = (x, angle) => `<g transform="translate(0 42) rotate(${angle} ${x + 13} 338)"><rect x="${x}" y="334" width="26" height="44" rx="10" fill="${fur}" stroke="${ink}" stroke-width="3.5"/><rect x="${x - 3}" y="372" width="32" height="14" rx="5" fill="${ink}"/></g>`;
+  // sitting: a thigh resting on the column, then the shin hanging down to a hoof
+  const sitLeg = x => `<rect x="${x}" y="330" width="30" height="40" rx="12" fill="${fur}" stroke="${ink}" stroke-width="3.5"/><rect x="${x + 2}" y="360" width="26" height="58" rx="10" fill="${fur}" stroke="${ink}" stroke-width="3.5"/><rect x="${x - 1}" y="412" width="32" height="14" rx="5" fill="${ink}"/>`;
   // a big sign, much wider than he is, so the note on it is very easy to read
   const sign = placard ? `<rect x="-44" y="190" width="328" height="206" rx="10" fill="#fff" stroke="${ink}" stroke-width="5"/>${placard.replace('<svg ', '<svg x="-36" y="196" width="312" height="194" preserveAspectRatio="xMidYMid meet" ')}` : '';
   let arms, front = '';
-  if (pose === 'heap') arms = arm('52 228', '26 296', '22 326') + arm('188 228', '214 296', '218 326') + fist(22, 330) + fist(218, 330);
+  if (pose === 'cheer') arms = arm('52 228', '8 160', '-6 70') + arm('188 228', '232 160', '246 70') + fist(-6, 64) + fist(246, 64);
+  else if (pose === 'sit') arms = arm('52 228', '34 288', '74 322') + arm('188 228', '206 288', '166 322') + fist(78, 324) + fist(162, 324);
   else if (pose === 'thumbs') {
     arms = arm('52 228', '-14 250', '-42 290');
     front = sign + fist(-44, 292) + arm('188 228', '250 196', '264 168')
@@ -80,15 +93,18 @@ function beastFigure(mood, pose, placard = '') {
     front = sign + fist(-44, 292) + fist(284, 292);
   }
   return `<svg class="beast-figure" viewBox="-60 0 360 436" role="img" aria-label="The Note Beast${placard ? ', holding up a note' : ''}">
-  <g class="legs legs-a">${leg(80, -16)}${leg(134, 16)}</g>
-  <g class="legs legs-b">${leg(80, 16)}${leg(134, -16)}</g>
+  ${pose === 'sit'
+    ? `${beastColumn()}${sitLeg(82)}${sitLeg(132)}`
+    : pose === 'cheer'
+    ? `<g transform="translate(0 -24)">${leg(80, -8)}${leg(134, 8)}</g>`
+    : `<g class="legs legs-a">${leg(80, -16)}${leg(134, 16)}</g><g class="legs legs-b">${leg(80, 16)}${leg(134, -16)}</g>`}
   <g stroke="${ink}" stroke-width="3.5" stroke-linejoin="round">
     <path d="M40 232 C40 206 80 194 120 194 C160 194 200 206 200 232 L186 300 C182 322 160 336 120 336 C80 336 58 322 54 300 Z" fill="${fur}"/>
     <path d="M86 214 C96 236 144 236 154 214 C150 252 136 270 120 272 C104 270 90 252 86 214 Z" fill="${tan}"/>
     <path d="M60 316 L180 316 L186 352 L172 342 L161 356 L149 342 L137 356 L125 342 L113 356 L101 342 L89 356 L77 342 L66 356 L60 352 Z" fill="${dark}"/>
   </g>
   ${arms}
-  <g transform="translate(20 0)">${beastHead(mood)}</g>
+  <g transform="translate(20 0)">${beastHead(mood)}${opts.laurel ? beastLaurel() : ''}</g>
   ${front}
 </svg>`;
 }

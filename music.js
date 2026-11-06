@@ -326,6 +326,32 @@ function loadBull(a) {
 // 'happy' plays the next success bellow in turn; 'sad' plays the Hereford bellow.
 // Until they've loaded, a made-up grunt stands in: two quick rising grunts, or one long sinking groan.
 // Either plays alongside other sounds and never stops them.
+// A big, sulky sigh: a breath in, then a long breath out that sinks, with a low grumble under it.
+function sigh(when = 0) {
+  const a = audioReady();
+  if (!a) return;
+  const t0 = a.currentTime + when + .02, len = 2.1;
+  const noise = a.createBuffer(1, Math.ceil(a.sampleRate * len), a.sampleRate), d = noise.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = noise;
+  bp.type = 'bandpass'; bp.Q.value = 1.6;
+  bp.frequency.setValueAtTime(700, t0); bp.frequency.linearRampToValueAtTime(1300, t0 + .4);   // in...
+  bp.frequency.setValueAtTime(1100, t0 + .55); bp.frequency.exponentialRampToValueAtTime(380, t0 + len);  // ...and out
+  g.gain.setValueAtTime(.0001, t0);
+  g.gain.exponentialRampToValueAtTime(.12, t0 + .35); g.gain.exponentialRampToValueAtTime(.02, t0 + .5);
+  g.gain.exponentialRampToValueAtTime(.55, t0 + .75); g.gain.setValueAtTime(.5, t0 + 1.1);
+  g.gain.exponentialRampToValueAtTime(.0001, t0 + len);
+  src.connect(bp); bp.connect(g); g.connect(masterGain); src.start(t0); src.stop(t0 + len);
+  // the grumble: a low, soft "hmmm" that slides down under the breath out
+  const os = a.createOscillator(), lp = a.createBiquadFilter(), hg = a.createGain();
+  os.type = 'sawtooth'; os.frequency.setValueAtTime(150, t0 + .6); os.frequency.exponentialRampToValueAtTime(85, t0 + len);
+  lp.type = 'lowpass'; lp.frequency.value = 420;
+  hg.gain.setValueAtTime(.0001, t0 + .6); hg.gain.exponentialRampToValueAtTime(.09, t0 + .85); hg.gain.exponentialRampToValueAtTime(.0001, t0 + len);
+  os.connect(lp); lp.connect(hg); hg.connect(masterGain); os.start(t0 + .6); os.stop(t0 + len);
+  liveNodes.push(src, os);
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + len + .3) * 1000);
+}
 function grunt(kind, when = 0) {
   const a = audioReady();
   if (!a) return;

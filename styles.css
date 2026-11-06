@@ -405,3 +405,34 @@ body.game-mode .board > * { flex: none; }
 @keyframes recoil { 0% { transform: translateY(0); } 30% { transform: translateY(-4%) scale(1.03); } 100% { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .runner.aghast .beast-figure { animation: none; } }
 
+/* the Challenge endings: sulking on a broken column under a rain cloud, or cheering in a golden laurel wreath */
+.runner.sitting .beast-figure { transform-origin: 50% 100%; transform: translateY(-3%) scale(.84); transition: transform .5s ease-in; }
+.runner.cheering .beast-figure { animation: cheer-jump .45s ease-in-out infinite alternate; }
+@keyframes cheer-jump { from { transform: translateY(0); } to { transform: translateY(-7%); } }
+.laurel { transform-box: fill-box; transform-origin: 50% 100%; animation: laurel-drop .9s cubic-bezier(.3, 1.4, .6, 1) both; }
+@keyframes laurel-drop { 0% { transform: translateY(-180px) rotate(-20deg); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(0) rotate(0); opacity: 1; } }
+.beast .laurel, .game-over .laurel { animation: none; }
+.ruins { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; z-index: 0; opacity: 0; transition: opacity .8s; pointer-events: none; }
+.ruins.show { opacity: .8; }
+.runner { z-index: 1; }
+.ruins svg { display: block; width: 100%; height: 100%; }
+.rain-cloud { position: absolute; top: -1%; left: 50%; width: clamp(110px, 16vw, 170px); transform: translateX(-50%); opacity: 0; transition: opacity .6s; z-index: 1; pointer-events: none; }
+.rain-cloud.show { opacity: 1; }
+.rain-cloud svg { display: block; width: 100%; height: auto; }
+.rain-cloud span { position: absolute; top: 62%; width: 3px; height: 14px; border-radius: 2px; background: #5aa0e0; opacity: 0; }
+.rain-cloud.show span { animation: rain .8s linear infinite; }
+.rain-cloud span:nth-child(2) { left: 22%; animation-delay: .1s !important; }
+.rain-cloud span:nth-child(3) { left: 40%; animation-delay: .45s !important; }
+.rain-cloud span:nth-child(4) { left: 58%; animation-delay: .25s !important; }
+.rain-cloud span:nth-child(5) { left: 74%; animation-delay: .6s !important; }
+.rain-cloud span:nth-child(6) { left: 32%; animation-delay: .7s !important; }
+@keyframes rain { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translateY(70px); opacity: 0; } }
+.confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+.confetti i { position: absolute; top: -6%; width: 10px; height: 16px; border-radius: 2px; opacity: 0; }
+.confetti i.leaf { width: 14px; height: 9px; border-radius: 0 100% 0 100%; }
+.confetti.show i { animation: confetti-fall 2.8s ease-in forwards; }
+@keyframes confetti-fall { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--drift), 520px) rotate(var(--spin)); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .runner.cheering .beast-figure, .laurel, .rain-cloud.show span, .confetti.show i { animation: none; } }
+/* a Greek key border under the winning words */
+.game-over.won h1::after { content: ''; display: block; height: 14px; margin: 8px auto 0; max-width: 320px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14' viewBox='0 0 28 14'%3E%3Cpath d='M0 13 H4 V1 H16 V9 H8 V5 H12 M12 5 V5 M16 13 H28' fill='none' stroke='%23b8902a' stroke-width='2'/%3E%3C/svg%3E") repeat-x center / 28px 14px; }
+
