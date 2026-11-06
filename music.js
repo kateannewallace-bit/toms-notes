@@ -312,24 +312,32 @@ function tone(midi, when = 0, dur = 0.9, vol = 0.6) {
   });
   if (liveNodes.length > 200) liveNodes = liveNodes.slice(-100);
 }
-// The happy grunt is a real bull: the start of an aggressive call (Freesound 610801 by JakobGille, CC0), loaded with the piano.
-let bullGrunt = null;
+// Note Beast's sounds are real bulls, from Freesound (all CC0), trimmed and level-matched:
+// wrong notes get a Hereford bull's loud bellow (827111 by TheKingOfGeeks360); right notes take turns through five
+// shorter bellows from a Yellowstone bison (519594 by Nivatius) and Angus cattle (813363 by NickTayloe).
+const BELLOWS = { sad: ['bellow-sad'], happy: ['bellow-happy-1', 'bellow-happy-2', 'bellow-happy-3', 'bellow-happy-4', 'bellow-happy-5'] };
+const bellowBuffers = { sad: [], happy: [] };
+let happyTurn = 0;
 function loadBull(a) {
-  fetch('sounds/bull-grunt.m4a').then(r => r.arrayBuffer()).then(d => new Promise((ok, no) => a.decodeAudioData(d, ok, no))).then(b => { bullGrunt = b; }).catch(() => {});
+  for (const [kind, names] of Object.entries(BELLOWS)) names.forEach((n, i) => {
+    fetch(`sounds/${n}.m4a`).then(r => r.arrayBuffer()).then(d => new Promise((ok, no) => a.decodeAudioData(d, ok, no))).then(b => { bellowBuffers[kind][i] = b; }).catch(() => {});
+  });
 }
-// 'happy': the bull recording (or, until it loads, two quick made-up grunts rising, hm-HM!).
-// 'sad': a made-up grunt, one long sinking groan, from a low buzzy voice through a muffling filter with a puff of breath.
+// 'happy' plays the next success bellow in turn; 'sad' plays the Hereford bellow.
+// Until they've loaded, a made-up grunt stands in: two quick rising grunts, or one long sinking groan.
 // Either plays alongside other sounds and never stops them.
 function grunt(kind, when = 0) {
   const a = audioReady();
   if (!a) return;
   const happy = kind === 'happy';
-  if (happy && bullGrunt) {
+  const loaded = bellowBuffers[happy ? 'happy' : 'sad'].filter(Boolean);
+  if (loaded.length) {
+    const buf = happy ? loaded[happyTurn++ % loaded.length] : loaded[0];
     const t0 = a.currentTime + when + .01, src = a.createBufferSource(), g = a.createGain();
-    src.buffer = bullGrunt; g.gain.value = 1.1;
+    src.buffer = buf; g.gain.value = .85;  // a touch under the piano, so Tom's note stays the main sound
     src.connect(g); g.connect(masterGain); src.start(t0);
     liveNodes.push(src);
-    soundingUntil = Math.max(soundingUntil, performance.now() + (when + bullGrunt.duration + .3) * 1000);
+    soundingUntil = Math.max(soundingUntil, performance.now() + (when + buf.duration + .3) * 1000);
     return;
   }
   const parts = happy ? [[0, .16, 105, 128], [.2, .24, 120, 150]] : [[0, .75, 112, 70]];

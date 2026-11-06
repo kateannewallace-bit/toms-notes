@@ -1,9 +1,9 @@
 // Offline support. Bump VERSION whenever app files change so devices pick up the update.
-const VERSION = 'notes-v36';
+const VERSION = 'notes-v38';
 const SHELL = [
   './', 'index.html', 'styles.css', 'glyphs.js', 'music.js', 'listen.js', 'beast.js', 'challenge.js', 'content.js', 'app.js', 'config.js', 'manifest.webmanifest',
   ...['A1', 'C2', 'Ds2', 'Fs2', 'A2', 'C3', 'Ds3', 'Fs3', 'A3', 'C4', 'Ds4', 'Fs4', 'A4', 'C5', 'Ds5', 'Fs5', 'A5', 'C6', 'Ds6', 'Fs6', 'A6'].map(n => `piano/${n}.mp3`),
-  'sounds/bull-grunt.m4a',
+  ...['bellow-sad', 'bellow-happy-1', 'bellow-happy-2', 'bellow-happy-3', 'bellow-happy-4', 'bellow-happy-5'].map(n => `sounds/${n}.m4a`),
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

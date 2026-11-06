@@ -383,4 +383,8 @@ body.game-mode .board > * { flex: none; }
 @keyframes caught-pop { 0% { opacity: 0; transform: translate(var(--side, 0%), -20%) scale(.4) rotate(-8deg); } 25% { opacity: 1; transform: translate(var(--side, 0%), -50%) scale(1.15) rotate(3deg); } 45% { transform: translate(var(--side, 0%), -55%) scale(1) rotate(0); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--side, 0%), -80%) scale(1); } }
 .caught-name.left { --side: -100%; transform-origin: 100% 50%; }
 @media (prefers-reduced-motion: reduce) { .caught-name.show { animation: none; opacity: 1; transform: translate(var(--side, 0%), -50%); } }
+.map-l { transition: fill .15s; }
+.map-l.sounding, .map-l.mid.sounding { fill: var(--green); font-size: 1.3em; }
+.tap-note.sounding .n-head, .tap-note.sounding .gl { fill: var(--green); }
+.tap-note.sounding .st-ledger { stroke: var(--green); }
 

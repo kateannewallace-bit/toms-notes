@@ -12,4 +12,4 @@ Bump `VERSION` in `sw.js` on every change. Sync uses the Chalkboard's Supabase f
 
 Piano sound: Salamander Grand Piano V3 by Alexander Holm (https://archive.org/details/SalamanderGrandPianoV3), CC BY 3.0, as the MP3 files published with Tone.js. A synthesized tone is the backup until they load.
 
-Note Beast's happy grunt (sounds/bull-grunt.m4a): the first 0.75 s of "ANMLFarm_Kuh-Bulle-Agressiv 19" by JakobGille, https://freesound.org/people/JakobGille/sounds/610801/ (CC0), trimmed and level-matched. The sad grunt is synthesized in music.js.
+Note Beast's bellows (sounds/): bellow-sad is a Hereford bull, https://freesound.org/people/TheKingOfGeeks360/sounds/827111/ ; bellow-happy-1 and -2 are a Yellowstone bison, https://freesound.org/people/Nivatius/sounds/519594/ ; bellow-happy-3 to -5 are Angus cattle, https://freesound.org/people/NickTayloe/sounds/813363/ . All CC0, trimmed and level-matched.

@@ -1332,13 +1332,22 @@ function renderHome() {
   <p class="meta">${todayCount ? `${todayCount} questions so far today. ` : ''}${state.total} answered since the start.</p>`;
 }
 // The Note Map: every note the app teaches, named, on both staffs. Tap a note to hear it.
+// On the Note Map, a tapped note and its letter light up while it sounds.
+let lit = null;
+function lightUp(note) {
+  if (lit) { clearTimeout(lit.timer); lit.els.forEach(e => e.classList.remove('sounding')); }
+  const label = note.closest('svg').querySelector(`.map-l[data-p="${note.dataset.play}"]`);
+  const els = [note, label].filter(Boolean);
+  els.forEach(e => e.classList.add('sounding'));
+  lit = { els, timer: setTimeout(() => { els.forEach(e => e.classList.remove('sounding')); lit = null; }, 1200) };
+}
 function renderMap() {
   const row = (c, lo, hi) => {
     const items = [];
     for (let s = stepOf(lo); s <= stepOf(hi); s++) items.push({ p: pitchOf(s), d: 'w', cls: pitchOf(s) === 'C4' ? 'now' : '' });
     const low = Math.min(...items.map(i => stepOf(i.p)));
     return staffSvg({ clef: c, S: 15, width: 880, even: true, items, cl: 'map-staff',
-      extra: ({ x, Y, S }) => items.map((it, i) => `<text class="map-l ${it.p === 'C4' ? 'mid' : ''}" x="${x[i]}" y="${Y(low) + S * 2.1}" text-anchor="middle" font-size="${S * 1.05}">${letterOf(stepOf(it.p))}</text>`).join('') });
+      extra: ({ x, Y, S }) => items.map((it, i) => `<text class="map-l ${it.p === 'C4' ? 'mid' : ''}" data-p="${it.p}" x="${x[i]}" y="${Y(low) + S * 2.1}" text-anchor="middle" font-size="${S * 1.05}">${letterOf(stepOf(it.p))}</text>`).join('') });
   };
   return `<header class="top"><h1>Note map</h1><button class="ghost" data-act="home">Back</button></header>
   <p class="note">Every note, named. The blue note is Middle C. Tap any note to hear it.</p>
@@ -1626,7 +1635,7 @@ function renderParent() {
     <div class="row-btns">${confirmWipe ? `<button class="ghost danger" data-act="wipe-yes">Yes, erase all progress</button><button class="link" data-act="wipe-no">Cancel</button>` : `<button class="ghost danger" data-act="wipe">Reset all progress</button>`}</div>
   </section>
   ${renderSync()}
-  <p class="note">Piano sound: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano V3</a> by Alexander Holm, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, converted to shorter MP3 files. Note Beast’s happy grunt is a real bull, from <a href="https://freesound.org/people/JakobGille/sounds/610801/" target="_blank" rel="noopener">a recording by JakobGille</a> on Freesound (CC0). Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
+  <p class="note">Piano sound: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano V3</a> by Alexander Holm, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, converted to shorter MP3 files. Note Beast’s bellows are real cattle from Freesound (CC0): <a href="https://freesound.org/people/TheKingOfGeeks360/sounds/827111/" target="_blank" rel="noopener">a Hereford bull by TheKingOfGeeks360</a>, <a href="https://freesound.org/people/Nivatius/sounds/519594/" target="_blank" rel="noopener">a Yellowstone bison by Nivatius</a> and <a href="https://freesound.org/people/NickTayloe/sounds/813363/" target="_blank" rel="noopener">Angus cattle by NickTayloe</a>. Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
 }
 function renderSync() {
   if (!syncAvailable) return '<p class="note">Progress is saved on this device.</p>';
@@ -1776,6 +1785,7 @@ app.addEventListener('click', e => {
   if (note) {
     audioReady(); playP(note.dataset.play, 1.2);
     if (screen === 'play' && sess?.probs[sess.i]?.mode === 'findC') findCTap(note.dataset.play);
+    if (screen === 'map') lightUp(note);
     return;
   }
   if (!b || b.disabled) return;
