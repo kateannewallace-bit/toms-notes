@@ -132,7 +132,7 @@ function showCaughtName() {
   const el = document.getElementById('caught-name');
   if (!el) return;
   const p = game.target[1];
-  el.textContent = p === 'C4' ? 'Middle C!' : `${letterOf(stepOf(p))}!`;
+  el.textContent = `${letterOf(stepOf(p))}!`;  // just the letter: 'Middle C!' was too long for the stage
   // just past his sign on the right, or on the left if there's no room
   // measured from the sign itself: his drawing's box is wider than what you see
   const stage = document.getElementById('stage').getBoundingClientRect(), him = (document.querySelector('#runner .beast-figure > rect') || document.getElementById('runner')).getBoundingClientRect();
