@@ -69,9 +69,62 @@ const CODE_KEY = 'toms-notes-sync-code';
 const CFG = window.NOTES_CONFIG || {};
 const syncAvailable = !!(CFG.supabaseUrl && CFG.supabaseKey && window.crypto?.subtle);
 function loadLocal() { try { const t = localStorage.getItem(LS_KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
-function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
-let state = normalize(loadLocal());
-let micTest = false, micLog = [];
+
+/* ---------- players: each child keeps their own progress ---------- */
+// The family holds every player's progress; `state` is the player on this device right now.
+// Progress saved before players existed becomes the first player, so nothing is lost.
+const PLAYER_KEY = 'toms-notes-player';
+function asFamily(raw) {
+  if (raw && raw.kids) return { kids: raw.kids, order: (raw.order || Object.keys(raw.kids)).filter(id => raw.kids[id]), updatedAt: raw.updatedAt || 0 };
+  return { kids: { p1: raw || null }, order: ['p1'], updatedAt: raw?.updatedAt || 0 };
+}
+let family = asFamily(loadLocal());
+for (const id of family.order) family.kids[id] = normalize(family.kids[id]);
+let playerId = (() => { try { return localStorage.getItem(PLAYER_KEY); } catch (e) { return null; } })();
+if (!family.kids[playerId]) playerId = family.order[0];
+let state = family.kids[playerId];
+function saveLocal() {
+  family.kids[playerId] = state;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(family)); localStorage.setItem(PLAYER_KEY, playerId); } catch (e) {}
+}
+function switchPlayer(id) {
+  if (!family.kids[id]) return;
+  family.kids[playerId] = state;
+  playerId = id;
+  state = family.kids[id];
+  saveLocal();
+}
+function addPlayer(name) {
+  const id = 'p' + Date.now().toString(36);
+  const kid = normalize(null);
+  kid.childName = name;
+  kid.updatedAt = Date.now();
+  family.kids[id] = kid;
+  family.order.push(id);
+  return id;
+}
+function removePlayer(id) {
+  if (id === playerId || family.order.length < 2) return;
+  delete family.kids[id];
+  family.order = family.order.filter(x => x !== id);
+  family.updatedAt = Date.now();
+  saveLocal(); pushRemote();
+}
+// Two copies of the family meet (this device and the synced copy): each player keeps whichever copy is newer.
+function mergeFamily(remote) {
+  const r = asFamily(remote);
+  let changed = false, newerHere = false;
+  for (const id of r.order) {
+    const theirs = r.kids[id], mine = family.kids[id];
+    if (!mine) { family.kids[id] = normalize(theirs); family.order.push(id); changed = true; }
+    else if ((theirs?.updatedAt || 0) > (mine.updatedAt || 0)) { family.kids[id] = normalize(theirs); changed = true; }
+    else if ((theirs?.updatedAt || 0) < (mine.updatedAt || 0)) newerHere = true;
+  }
+  if (family.order.some(id => !r.kids[id])) newerHere = true;
+  if (changed) { state = family.kids[playerId] || family.kids[family.order[0]]; playerId = family.kids[playerId] ? playerId : family.order[0]; }
+  return { changed, newerHere };
+}
+let micTest = false, micLog = [], confirmRemove = null;
 let screen = 'home', sess = null, lastChanges = [], song = null, confirmWipe = false, confirmTopic = null;
 const sync = { code: '', key: '', status: 'off', lastAt: 0, saving: false, dirty: false, error: '' };
 try { sync.code = localStorage.getItem(CODE_KEY) || ''; } catch (e) {}
@@ -105,7 +158,7 @@ async function pushRemote() {
   if (!sync.key) return;
   if (sync.saving) { sync.dirty = true; return; }
   sync.saving = true;
-  try { await rpc('chalkboard_save', { p_key: sync.key, p_data: state }); sync.status = 'ok'; sync.lastAt = Date.now(); sync.error = ''; }
+  try { await rpc('chalkboard_save', { p_key: sync.key, p_data: family }); sync.status = 'ok'; sync.lastAt = Date.now(); sync.error = ''; }
   catch (e) { sync.status = 'error'; sync.error = navigator.onLine === false ? 'offline' : String(e.message || e); }
   sync.saving = false;
   if (screen === 'parent') render();
@@ -117,8 +170,12 @@ async function pullRemote() {
   try {
     const remote = await rpc('chalkboard_get', { p_key: sync.key });
     sync.status = 'ok'; sync.lastAt = Date.now(); sync.error = '';
-    if (remote && (remote.updatedAt || 0) > (state.updatedAt || 0)) { state = normalize(remote); saveLocal(); }
-    else if (!remote || (remote.updatedAt || 0) < (state.updatedAt || 0)) pushRemote();
+    if (!remote) pushRemote();
+    else {
+      const { changed, newerHere } = mergeFamily(remote);
+      if (changed) saveLocal();
+      if (newerHere) pushRemote();
+    }
   } catch (e) { sync.status = 'error'; sync.error = navigator.onLine === false ? 'offline' : String(e.message || e); }
   if (screen === 'home' || screen === 'parent') render();
 }
@@ -133,7 +190,7 @@ function stopSync() {
   sync.code = ''; sync.key = ''; sync.status = 'off';
   try { localStorage.removeItem(CODE_KEY); } catch (e) {}
 }
-function save() { state.updatedAt = Date.now(); saveLocal(); pushRemote(); }
+function save() { state.updatedAt = Date.now(); family.updatedAt = state.updatedAt; saveLocal(); pushRemote(); }
 function initSync() {
   if (!syncAvailable) return;
   if (sync.code) startSync(sync.code);
@@ -1311,7 +1368,7 @@ function renderHome() {
   const todayCount = state.sessions.filter(s => new Date(s.d).toDateString() === today).reduce((t, s) => t + s.n, 0);
   const chip = k => `<button class="chip ${TOPIC[k].star ? 'star-chip' : ''}" data-act="chip" data-k="${k}" aria-pressed="${!!state.on[k]}"><strong>${esc(TOPIC[k].name)}</strong><small>${waitingFor(k) ? `Starts after ${esc(TOPIC[waitingFor(k)].name)}` : `${esc(TOPIC[k].note)} · level ${levelNow(k)}`}</small>${levelBar(k)}</button>`;
   return `
-  <header class="top"><div class="app-name"><h1>Note Beast</h1><p class="hello">${esc(greet('Hello'))}</p></div><button class="link" data-act="parent">For grown-ups</button></header>
+  <header class="top"><div class="app-name"><h1>Note Beast</h1><p class="hello">${esc(greet('Hello'))} <button class="link switch-player" data-act="who">${family.order.length > 1 ? 'Switch player' : 'Add a player'}</button></p></div><button class="link" data-act="parent">For grown-ups</button></header>
   <section>
     <div class="goal-head"><h2>Notes learned</h2><span class="count">${caught} of ${total}</span></div>
     ${hunterMap()}
@@ -1355,6 +1412,15 @@ function renderMap() {
   <section><h2>Bass clef</h2><div class="map-scroll">${row('b', 'A1', 'G4')}</div></section>
   <section><h2>The two staffs together</h2><div class="staff-wrap">${grandSvg({ S: 14, width: 420, t: [{ p: 'C4', d: 'w', cls: 'now' }, { p: 'G4', d: 'w' }], b: [{ p: 'F3', d: 'w' }, { p: 'C4', d: 'w', cls: 'now' }] })}</div>
   <p class="note">Treble G sits on the line the treble clef curls around. Bass F sits on the line between the bass clef’s dots. Middle C can be written just below the treble staff or just above the bass staff: the same key either way.</p></section>`;
+}
+// Who's playing: one big button per player, and a way to add another.
+let addingPlayer = false;
+function renderWho() {
+  const levelOf = kid => { const done = ORDER.filter(k => kid.mastered?.[k]).length; return done ? `${done} finished` : 'Just starting'; };
+  return `<header class="top"><h1>Who’s playing?</h1><button class="ghost" data-act="home">Back</button></header>
+  <div class="players">${family.order.map(id => { const kid = family.kids[id]; return `<button class="player ${id === playerId ? 'current' : ''}" data-act="pick-player" data-id="${id}"><strong>${esc(kid.childName || 'Player')}</strong><small>${id === playerId ? 'Playing now · ' : ''}${levelOf(kid)}</small></button>`; }).join('')}</div>
+  ${addingPlayer ? `<form class="name-form" id="new-player"><label for="new-player-name">New player’s name</label><div class="row-btns"><input id="new-player-name" class="pick" maxlength="24" autocomplete="off" autofocus><button class="start" type="submit">Add</button><button class="link" type="button" data-act="who-cancel">Cancel</button></div></form>` : '<button class="ghost" data-act="add-player">+ Add a player</button>'}
+  <p class="note">Each player has their own progress, levels and settings on this device. With sync turned on, every player’s progress is shared between devices.</p>`;
 }
 function promptRow(text) {
   return `<div class="prompt-row"><span class="prompt">${esc(text)}</span>${canSpeak ? `<button class="say" data-act="say" aria-label="Read it aloud">${speakerIcon}</button>` : ''}</div>`;
@@ -1604,6 +1670,7 @@ function renderParent() {
   </section>
   <section>
     <h2>Settings</h2>
+    <p class="note">These settings and the levels on this page are for ${esc(N())}. Each player has their own.</p>
     <form class="name-form" id="name-form"><label for="child-name">Child's name</label><div class="row-btns"><input id="child-name" class="pick" maxlength="24" autocomplete="off" value="${esc(childName())}"><button class="ghost" type="submit">Save</button></div></form>
     <div class="row-btns"><span>Questions per round</span><div class="seg">${[5, 10, 15, 20].map(x => `<button data-act="per" data-n="${x}" aria-pressed="${state.perSession === x}">${x}</button>`).join('')}</div></div>
     <div class="row-btns"><span>Read aloud automatically</span>${seg('autospeak', state.autoSpeak ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
@@ -1634,6 +1701,11 @@ function renderParent() {
     <p class="note">Clears levels, learned notes, review and rounds. Keeps the name, settings and sync.</p>
     <div class="row-btns">${confirmWipe ? `<button class="ghost danger" data-act="wipe-yes">Yes, erase all progress</button><button class="link" data-act="wipe-no">Cancel</button>` : `<button class="ghost danger" data-act="wipe">Reset all progress</button>`}</div>
   </section>
+  <section>
+    <h2>Players</h2>
+    <ul class="list">${family.order.map(id => `<li><span>${esc(family.kids[id].childName || 'Player')}${id === playerId ? ' (playing now)' : ''}</span><span>${id === playerId || family.order.length < 2 ? '' : confirmRemove === id ? `<button class="link danger-text" data-act="remove-player-yes" data-id="${id}">Yes, remove and erase their progress</button> <button class="link" data-act="remove-player-no">Cancel</button>` : `<button class="link small-link" data-act="remove-player" data-id="${id}">Remove</button>`}</span></li>`).join('')}</ul>
+    <div class="row-btns"><button class="ghost" data-act="who">Switch or add a player</button></div>
+  </section>
   ${renderSync()}
   <p class="note">Piano sound: <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano V3</a> by Alexander Holm, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>, converted to shorter MP3 files. Note Beast’s bellows are real cattle from Freesound (CC0): <a href="https://freesound.org/people/TheKingOfGeeks360/sounds/827111/" target="_blank" rel="noopener">a Hereford bull by TheKingOfGeeks360</a>, <a href="https://freesound.org/people/Nivatius/sounds/519594/" target="_blank" rel="noopener">a Yellowstone bison by Nivatius</a> and <a href="https://freesound.org/people/NickTayloe/sounds/813363/" target="_blank" rel="noopener">Angus cattle by NickTayloe</a>. Clefs and rests are drawn from the Noto Music font (SIL Open Font License). All songs are traditional or public domain.</p>`;
 }
@@ -1656,7 +1728,7 @@ function render(shake) {
   // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
   document.body.classList.toggle('song-mode', screen === 'song');
   document.body.classList.toggle('game-mode', screen === 'challenge');
-  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : renderHome();
+  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
   if (screen === 'play' || screen === 'done') showBeast();
@@ -1725,6 +1797,13 @@ function resetTopic(k) {
   for (let i = 1; i <= maxLevel(k); i++) delete state.chapters[chapterKey(k, i)];
 }
 const ACTIONS = {
+  who() { screen = 'who'; addingPlayer = family.order.length < 2; render(); window.scrollTo?.({ top: 0 }); },
+  'add-player'() { addingPlayer = true; render(); document.getElementById('new-player-name')?.focus(); },
+  'who-cancel'() { addingPlayer = false; render(); },
+  'pick-player'(d) { switchPlayer(d.id); addingPlayer = false; screen = 'home'; render(); window.scrollTo?.({ top: 0 }); },
+  'remove-player'(d) { confirmRemove = d.id; render(); },
+  'remove-player-no'() { confirmRemove = null; render(); },
+  'remove-player-yes'(d) { removePlayer(d.id); confirmRemove = null; render(); },
   parent() { screen = 'parent'; confirmWipe = false; confirmTopic = null; render(); },
   home() { if (game) { cancelAnimationFrame(game.raf); game = null; } hush(); stopMic(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
   chip(d) { state.on[d.k] = !state.on[d.k]; save(); render(); },
@@ -1813,6 +1892,14 @@ app.addEventListener('pointermove', e => { if (dragging) placeAt(e); });
 window.addEventListener('pointerup', () => { dragging = false; });
 app.addEventListener('submit', e => {
   e.preventDefault();
+  if (e.target.id === 'new-player') {
+    const name = (document.getElementById('new-player-name')?.value || '').trim().slice(0, 24);
+    if (!name) return;
+    const id = addPlayer(name);
+    switchPlayer(id);
+    addingPlayer = false; screen = 'home'; save(); render(); window.scrollTo?.({ top: 0 });
+    return;
+  }
   if (e.target.id !== 'name-form') return;
   state.childName = (document.getElementById('child-name')?.value || '').trim().slice(0, 24);
   save(); render();

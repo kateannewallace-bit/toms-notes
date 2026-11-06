@@ -50,8 +50,9 @@ function challengeFrame(now) {
   placeBeast(t);
   if (t >= 1) {
     if (game.phase === 'in') setPhase('wait');
-    else if (game.phase === 'wait') { game.from = .5; setPhase('out'); }
-    else if (game.phase === 'scowl') { game.from = game.x; setPhase('flee'); }
+    else if (game.phase === 'wait') { game.from = game.x; setPhase('out'); }
+    // after shaking the sign, he stays put and gives another try at the same note
+    else if (game.phase === 'scowl') { game.missed = false; game.mood = 'happy'; setPhase('wait'); }
     else if (game.phase === 'out' || game.phase === 'flee') {
       // he left without the right note: a miss if Tom didn't press anything, then another lap with the same note
       if (!game.missed) { loseHorn(); if (game.over) return; }
@@ -119,7 +120,7 @@ function challengeKey(midi) {
     grunt('happy', hearing() ? 0 : .8);
     return;
   }
-  // wrong: he stops and scowls, Tom loses a pair of horns, then he runs off to come round again
+  // wrong: he stops, scowls and shakes the sign, Tom loses a pair of horns, then he waits for another try at the same note
   game.missed = true;
   game.mood = 'scowl';
   grunt('sad', hearing() ? 0 : .7);
