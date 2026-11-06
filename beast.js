@@ -1,4 +1,4 @@
-/* The Note Beast: a friendly, hairy minotaur. Faces: 'happy', 'worried', 'scowl' and 'dizzy'. */
+/* The Note Beast: a friendly, hairy minotaur. Faces: 'happy', 'worried', 'scowl', 'aghast' and 'dizzy'. */
 const BEAST_INK = '#2a1a10', BEAST_FUR = '#8a5a3b', BEAST_DARK = '#5b3922', BEAST_TAN = '#e2bf96', BEAST_HORN = '#f1e6c8';
 // His head, in a 200 × 210 box (no shoulders).
 function beastHead(mood) {
@@ -7,12 +7,15 @@ function beastHead(mood) {
     happy: '<path d="M66 80 Q79 70 92 79" /><path d="M134 80 Q121 70 108 79" />',
     worried: '<path d="M66 86 L92 76" /><path d="M134 86 L108 76" />',
     scowl: '<path d="M64 76 L93 88" /><path d="M136 76 L107 88" />',
+    aghast: '<path d="M62 78 L93 89" /><path d="M138 78 L107 89" /><path d="M97 80 L97 90 M103 80 L103 90" stroke-width="2.5" />',
     dizzy: '<path d="M66 80 Q79 74 92 80" /><path d="M134 80 Q121 74 108 80" />',
   }[mood];
   const eyes = mood === 'happy'
     ? `<circle cx="80" cy="100" r="12" fill="#fff"/><circle cx="120" cy="100" r="12" fill="#fff"/><circle cx="81" cy="101" r="6" fill="${ink}"/><circle cx="119" cy="101" r="6" fill="${ink}"/><circle cx="83" cy="98" r="2.2" fill="#fff" stroke="none"/><circle cx="121" cy="98" r="2.2" fill="#fff" stroke="none"/>`
     : mood === 'dizzy'
     ? '<path d="M72 92 L88 108 M88 92 L72 108 M112 92 L128 108 M128 92 L112 108" fill="none" stroke-width="4"/>'
+    : mood === 'aghast'
+    ? `<circle cx="80" cy="103" r="13" fill="#fff"/><circle cx="120" cy="103" r="13" fill="#fff"/><circle cx="80" cy="104" r="4" fill="${ink}"/><circle cx="120" cy="104" r="4" fill="${ink}"/>`
     : mood === 'scowl'
     ? `<circle cx="80" cy="102" r="10" fill="#fff"/><circle cx="120" cy="102" r="10" fill="#fff"/><circle cx="81" cy="104" r="5" fill="${ink}"/><circle cx="119" cy="104" r="5" fill="${ink}"/>`
     : `<circle cx="80" cy="101" r="11" fill="#fff"/><circle cx="120" cy="101" r="11" fill="#fff"/><circle cx="82" cy="98" r="5.5" fill="${ink}"/><circle cx="118" cy="98" r="5.5" fill="${ink}"/>`;
@@ -20,11 +23,13 @@ function beastHead(mood) {
     happy: '<path d="M82 154 Q100 180 118 154 Z" fill="#7a2c2c"/><path d="M90 163 Q100 172 110 163 Q100 168 90 163 Z" fill="#e88a8a" stroke="none"/>',
     worried: '<path d="M86 167 Q100 156 114 167" fill="none"/>',
     scowl: '<path d="M82 170 Q100 152 118 170" fill="none" stroke-width="4.5"/>',
+    aghast: '<path d="M78 172 Q80 152 100 154 Q120 152 122 172 Q100 166 78 172 Z" fill="#7a2c2c"/><path d="M84 158 Q100 154 116 158 L115 163 Q100 160 85 163 Z" fill="#fff" stroke-width="2"/>',
     dizzy: '<path d="M82 164 q9 -9 18 0 q9 9 18 0" fill="none"/>',
   }[mood];
   const extra = {
     happy: '<circle cx="61" cy="126" r="8" fill="#f0a49a" opacity=".75" stroke="none"/><circle cx="139" cy="126" r="8" fill="#f0a49a" opacity=".75" stroke="none"/>',
     worried: '<path d="M151 70 Q156 80 151 85 Q146 80 151 70 Z" fill="#9fcbe9" stroke-width="2"/>',
+    aghast: '',
     scowl: '<circle cx="61" cy="126" r="9" fill="#d9534f" opacity=".45" stroke="none"/><circle cx="139" cy="126" r="9" fill="#d9534f" opacity=".45" stroke="none"/><path d="M34 44 q-9 -9 0 -18 q9 -9 0 -18 M166 44 q9 -9 0 -18 q-9 -9 0 -18" fill="none" stroke="#9aa3a8" stroke-width="4"/>',
     dizzy: '<path d="M60 24 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1 Z M140 18 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1 Z" fill="#f3d77a" stroke-width="2"/>',
   }[mood];

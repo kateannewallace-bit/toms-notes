@@ -320,7 +320,10 @@ body.song-mode .board > .song-lines { flex: 1 1 0; min-height: 0; overflow-y: au
 .map-l.space { fill: var(--chalk-dim); font-weight: 400; }
 .map-l.mid { fill: var(--blue); }
 .map-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.map-scroll svg.staff { min-width: 760px; max-height: none; }
+.map-scroll svg.staff { min-width: 560px; max-height: none; }
+.more-notes { display: flex; flex-direction: column; gap: 12px; }
+.more-notes summary { cursor: pointer; font-weight: 700; padding: 8px 0; }
+.more-notes[open] summary { margin-bottom: 8px; }
 svg.staff.grand { max-height: 60vh; }
 .findc-wrap { max-width: 560px; }
 .findc-wrap .note-hit { cursor: pointer; }
@@ -396,4 +399,9 @@ body.game-mode .board > * { flex: none; }
 .player strong { font-size: 1.6rem; }
 .player small { color: var(--chalk-dim); }
 .player.current { border-color: #111; background: var(--board-2); }
+.game-says { position: absolute; top: 4%; left: calc(50% + clamp(90px, 13vw, 150px)); transform: none; opacity: 0; font-size: clamp(1rem, 2.4vw, 1.4rem); z-index: 2; transition: opacity .2s; }
+.stage:has(.runner.saying) .game-says { opacity: 1; }
+.runner.aghast .beast-figure { animation: recoil .5s ease-out 1; }
+@keyframes recoil { 0% { transform: translateY(0); } 30% { transform: translateY(-4%) scale(1.03); } 100% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .runner.aghast .beast-figure { animation: none; } }
 

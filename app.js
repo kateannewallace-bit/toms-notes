@@ -1403,13 +1403,19 @@ function renderMap() {
     const items = [];
     for (let s = stepOf(lo); s <= stepOf(hi); s++) items.push({ p: pitchOf(s), d: 'w', cls: pitchOf(s) === 'C4' ? 'now' : '' });
     const low = Math.min(...items.map(i => stepOf(i.p)));
-    return staffSvg({ clef: c, S: 15, width: 880, even: true, items, cl: 'map-staff',
+    return staffSvg({ clef: c, S: 20, width: 880, even: true, items, cl: 'map-staff',
       extra: ({ x, Y, S }) => items.map((it, i) => `<text class="map-l ${it.p === 'C4' ? 'mid' : ''}" data-p="${it.p}" x="${x[i]}" y="${Y(low) + S * 2.1}" text-anchor="middle" font-size="${S * 1.05}">${letterOf(stepOf(it.p))}</text>`).join('') });
   };
   return `<header class="top"><h1>Note map</h1><button class="ghost" data-act="home">Back</button></header>
-  <p class="note">Every note, named. The blue note is Middle C. Tap any note to hear it.</p>
-  <section><h2>Treble clef</h2><div class="map-scroll">${row('t', 'F3', 'E6')}</div></section>
-  <section><h2>Bass clef</h2><div class="map-scroll">${row('b', 'A1', 'G4')}</div></section>
+  <p class="note">The notes on each staff, named. The blue note is Middle C. Tap any note to hear it.</p>
+  <section><h2>Treble clef</h2><div class="map-scroll">${row('t', 'C4', 'G5')}</div></section>
+  <section><h2>Bass clef</h2><div class="map-scroll">${row('b', 'F2', 'C4')}</div></section>
+  <details class="more-notes"><summary>More notes: the ledger lines</summary>
+    <section><h2>High treble notes</h2><div class="map-scroll">${row('t', 'A5', 'E6')}</div></section>
+    <section><h2>Low treble notes</h2><div class="map-scroll">${row('t', 'F3', 'B3')}</div></section>
+    <section><h2>High bass notes</h2><div class="map-scroll">${row('b', 'D4', 'G4')}</div></section>
+    <section><h2>Low bass notes</h2><div class="map-scroll">${row('b', 'A1', 'E2')}</div></section>
+  </details>
   <section><h2>The two staffs together</h2><div class="staff-wrap">${grandSvg({ S: 14, width: 420, t: [{ p: 'C4', d: 'w', cls: 'now' }, { p: 'G4', d: 'w' }], b: [{ p: 'F3', d: 'w' }, { p: 'C4', d: 'w', cls: 'now' }] })}</div>
   <p class="note">Treble G sits on the line the treble clef curls around. Bass F sits on the line between the bass clef’s dots. Middle C can be written just below the treble staff or just above the bass staff: the same key either way.</p></section>`;
 }

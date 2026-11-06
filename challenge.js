@@ -1,5 +1,5 @@
 /* Note Beast Challenge: the Note Beast runs across the top holding a placard with a note on a staff.
-   Play that note on the keys before he runs off. Ten right wins; three misses and he collapses.
+   Play that note on the keys before he runs off. Ten right wins; three misses and he's aghast, and it's time to try again.
    A wrong key, or letting him run off, costs a pair of horns and sends him round for another lap with the same note. */
 
 const CHALLENGE_GOAL = 10, CHALLENGE_LIVES = 3;
@@ -8,14 +8,13 @@ const CHALLENGE_FROM = 'C3', CHALLENGE_WHITES = 15;
 let game = null;
 
 // Notes Tom has learned, with their clefs: the landmarks always, plus notes met in Out from Middle C, within the keys shown.
+// Levels 1 and 2 ask only the landmarks. From level 3, each level adds two more learned notes, the ones closest to Middle C first.
 function challengePool() {
   const lo = midiOf(CHALLENGE_FROM), hi = whiteMidi(stepOf(CHALLENGE_FROM) + CHALLENGE_WHITES - 1);
   const pool = [['t', 'C4'], ['b', 'C4'], ['t', 'G4'], ['b', 'F3']];
-  for (const it of allItems('path')) {
-    if (!it.note || !isSeen(it.wid)) continue;
-    const m = midiOf(it.p);
-    if (m >= lo && m <= hi && !pool.some(([c, p]) => c === it.clef && p === it.p)) pool.push([it.clef, it.p]);
-  }
+  const learned = allItems('path').filter(it => it.note && isSeen(it.wid) && midiOf(it.p) >= lo && midiOf(it.p) <= hi && !pool.some(([c, p]) => c === it.clef && p === it.p))
+    .sort((a, b) => Math.abs(stepOf(a.p) - stepOf('C4')) - Math.abs(stepOf(b.p) - stepOf('C4')));
+  for (const it of learned.slice(0, Math.max(0, challengeLevel() - 2) * 2)) pool.push([it.clef, it.p]);
   return pool;
 }
 function startChallenge() {
@@ -38,7 +37,7 @@ function nextPlacard() {
 }
 // A pass takes about nine seconds at level 1, from when he appears to when he's gone. Each Challenge won makes
 // the next level a little quicker: about six seconds by level 7, and never quicker than about four.
-const PHASE_MS = { in: 2700, wait: 3600, out: 2700, scowl: 1200, flee: 900, fly: 1000, collapse: 2400 };
+const PHASE_MS = { in: 2700, wait: 3600, out: 2700, scowl: 1200, flee: 900, fly: 1000, aghast: 2400 };
 const challengeLevel = () => (state.challenge?.wins || 0) + 1;
 const lapSpeed = () => Math.max(.45, 1 - (challengeLevel() - 1) * .056);
 function challengeFrame(now) {
@@ -61,7 +60,7 @@ function challengeFrame(now) {
     } else if (game.phase === 'fly') {
       if (game.caught >= CHALLENGE_GOAL) return finishChallenge('won');
       nextPlacard(); game.t0 = now; drawBeast();
-    } else if (game.phase === 'collapse') return finishChallenge('lost');
+    } else if (game.phase === 'aghast') return finishChallenge('lost');
   }
   game.raf = requestAnimationFrame(challengeFrame);
 }
@@ -71,15 +70,17 @@ function placeBeast(t) {
   if (!el) return;
   const lift = game.phase === 'fly' ? -t * 140 : 0;
   el.style.left = `${game.x * 100}%`;
-  el.style.transform = `translate(-50%, ${lift}%)${game.phase === 'collapse' ? ` rotate(${Math.min(1, t * 1.6) * 82}deg) translateY(${Math.min(1, t * 1.6) * 18}%)` : ''}`;
+  el.style.transform = `translate(-50%, ${lift}%)`;
   el.classList.toggle('running', ['in', 'out', 'flee'].includes(game.phase));
   el.classList.toggle('stomping', game.phase === 'scowl');
+  el.classList.toggle('aghast', game.phase === 'aghast');
+  el.classList.toggle('saying', game.phase === 'aghast');
 }
 function drawBeast() {
   const el = document.getElementById('runner');
   if (!el) return;
   const [clef, p] = game.target;
-  const placard = game.pose === 'heap' ? '' : staffSvg({ clef, S: 12, width: 168, tight: true, items: [{ p, d: 'w' }], noteX: 118 });
+  const placard = staffSvg({ clef, S: 12, width: 168, tight: true, items: [{ p, d: 'w' }], noteX: 118 });
   el.innerHTML = beastFigure(game.mood, game.pose, placard);
   placeBeast(0);
 }
@@ -96,11 +97,11 @@ function loseHorn() {
   updateHud();
   if (game.lives <= 0) {
     game.over = 'lost';
-    game.mood = 'dizzy'; game.pose = 'heap'; game.x = .5;
-    setPhase('collapse');
-    // a sad sound: a slow slide down
-    // after the last wrong note and its grunt have finished, so it doesn't cut them off
-    setTimeout(() => { if (screen === 'challenge') playSeq([{ midi: 64, beats: .7 }, { midi: 63, beats: .7 }, { midi: 62, beats: .7 }, { midi: 61, beats: 1.6 }], 80); }, 1300);
+    // he stays standing, shocked and disgusted, and tells Tom to try again: no falling over
+    game.mood = 'aghast'; game.pose = 'hold'; game.x = .5;  // in the middle, so his face is always seen
+    setPhase('aghast');
+    const say = document.getElementById('beast-says');
+    if (say) say.textContent = 'Try again!';
     game.raf = requestAnimationFrame(challengeFrame);
   }
 }
@@ -158,9 +159,9 @@ function renderChallenge() {
   const keys = pianoSvg({ from: stepOf(CHALLENGE_FROM), whites: CHALLENGE_WHITES, letters: 'c' });
   const panel = !game.finished ? '' : game.over === 'won'
     ? `<div class="game-over won"><div class="beast won">${beastSvg('happy')}</div><h1>You beat the Note Beast Challenge!</h1><p class="beast-says">${esc(pick(BEAST_SAYS.doneHappy))}</p><div class="row-btns"><button class="start" data-act="challenge">Play again</button><button class="ghost" data-act="home">Home</button></div></div>`
-    : `<div class="game-over lost"><div class="beast">${beastSvg('worried')}</div><h1>TRY AGAIN</h1><p class="meta">You caught ${game.caught} of ${CHALLENGE_GOAL}.</p><div class="row-btns"><button class="start" data-act="challenge">Try again</button><button class="ghost" data-act="home">Home</button></div></div>`;
+    : `<div class="game-over lost"><div class="beast">${beastSvg('aghast')}</div><h1>TRY AGAIN</h1><p class="meta">You caught ${game.caught} of ${CHALLENGE_GOAL}.</p><div class="row-btns"><button class="start" data-act="challenge">Try again</button><button class="ghost" data-act="home">Home</button></div></div>`;
   return `<header class="top game-top"><span class="caught-label">Level ${challengeLevel()} · Caught <strong id="caught">${game.caught} of ${CHALLENGE_GOAL}</strong></span><span id="lives" class="lives" role="img" aria-label="${game.lives} of ${CHALLENGE_LIVES} lives left">${hornsHtml()}</span></header>
-  <div class="stage" id="stage"><div class="runner" id="runner"></div><div class="caught-name" id="caught-name" aria-live="polite"></div>${panel}</div>
+  <div class="stage" id="stage"><div class="runner" id="runner"></div><div class="caught-name" id="caught-name" aria-live="polite"></div><p class="beast-says game-says" id="beast-says"></p>${panel}</div>
   <div class="game-keys ${hearing() ? 'listening' : ''}">${hearing() ? listenPanel('Listening. Play the note on your piano.') : keys}</div>
   <button class="link" data-act="home" style="align-self:flex-start">Stop and go home</button>`;
 }
