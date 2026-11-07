@@ -496,4 +496,7 @@ body.game-mode .board > * { flex: none; }
 .hero:not(.in), .party:not(.in) { visibility: hidden; }  /* waiting off stage: his sword must not poke in */
 .speed-row { align-items: center; gap: 10px; }
 .speed-row input[type="range"] { flex: 1 1 200px; max-width: 320px; accent-color: #111; height: 32px; border: none; background: transparent; padding: 0; box-shadow: none; }
+/* answering out loud */
+.speak-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; margin: 10px auto; padding: 10px 14px; border: 2px dashed rgba(17,17,17,.35); border-radius: 10px; max-width: 560px; font-size: 1.05rem; }
+.speak-bar strong { min-width: 6em; }
 

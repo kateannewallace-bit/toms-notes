@@ -182,7 +182,9 @@ function loseHorn() {
 function challengeKey(midi) {
   // the note Tom plays always sounds in full, clearly; the grunt comes after it, never over it
   const playIt = () => { if (!hearing()) tone(midi, 0, 1.1, .85); };
-  if (!game || game.over || !['in', 'wait'].includes(game.phase) || game.missed) { playIt(); return; }
+  // answers count from when he comes in until the last bit of him has gone off the right edge
+  const leaving = game?.phase === 'out';
+  if (!game || game.over || !(['in', 'wait'].includes(game.phase) || (leaving && stillOnStage())) || game.missed) { playIt(); return; }
   const want = midiOf(game.target[1]);
   const ok = hearing() ? midi % 12 === want % 12 : midi === want;
   playIt();
@@ -217,6 +219,13 @@ function challengeKey(midi) {
     grunt('happy', hearing() ? 0 : .8);
     return;
   }
+  // wrong as he's leaving: a pair of horns, and he keeps going; the same note comes back on his next lap
+  if (leaving) {
+    game.missed = true; game.mood = 'scowl'; drawBeast();
+    grunt('sad', hearing() ? 0 : .7);
+    loseHorn();
+    return;
+  }
   // wrong: he stops, scowls and shakes the sign, Tom loses a pair of horns, then he waits for another try at the same note
   game.missed = true;
   game.mood = 'scowl';
@@ -224,6 +233,13 @@ function challengeKey(midi) {
   loseHorn();
   if (game.over) return;
   setPhase('scowl');
+}
+// Is any of him (horns, sign or hooves) still inside the stage?
+function stillOnStage() {
+  const stage = document.getElementById('stage')?.getBoundingClientRect(), fig = document.querySelector('#runner .beast-figure');
+  if (!stage || !fig) return false;
+  const parts = [...fig.querySelectorAll('path, rect, circle')].map(e => e.getBoundingClientRect()).filter(r => r.width || r.height);
+  return parts.some(r => r.left < stage.right - 2);
 }
 // The note's name bursts up beside him as he flies away.
 function showCaughtName() {

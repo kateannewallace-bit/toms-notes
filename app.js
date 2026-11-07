@@ -220,6 +220,126 @@ function say(text) {
   } catch (e) {}
 }
 
+/* ---------- speaking answers: a test on the grown-ups page ---------- */
+// Safari's speech recognition (the iPad's dictation). This is only a test for now: Tom says letters and it
+// shows what the iPad heard and which note letter that would count as. Sound goes to Apple to become text.
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let speechTest = null;  // { on, status, log: [{ alts, letter }] }
+// The words a child's letter is likely to come back as. Single letters sound alike, so this is generous.
+const SPOKEN_LETTERS = {
+  A: ['a', 'ay', 'aye', 'eh', 'hey', 'hay', 'eight'],
+  B: ['b', 'be', 'bee', 'bea', 'beat', 'v', 'vee'],
+  C: ['c', 'see', 'sea', 'si', 'cee', 'she', 'seed', 'z', 'zee'],
+  D: ['d', 'dee', 'de', 'the', 'tea', 't', 'tee'],
+  E: ['e', 'ee', 'eee', 'he', 'yee', 'ye'],
+  F: ['f', 'eff', 'ef', 'if', 'elf', 'off'],
+  G: ['g', 'gee', 'jee', 'ji', 'gi', 'jean', 'g.'],
+};
+function spokenLetter(text) {
+  const t = text.toLowerCase().replace(/[^a-z ]/g, ' ').trim();
+  if (/\bmiddle\s+(c|see|sea)\b/.test(t)) return 'C';
+  for (const w of t.split(/\s+/).reverse()) for (const [L, words] of Object.entries(SPOKEN_LETTERS)) if (words.includes(w)) return L;
+  return '';
+}
+function startSpeechTest() {
+  if (!SpeechRec) { speechTest = { on: false, status: 'unsupported', log: [] }; return; }
+  stopMic(); micTest = false;
+  speechTest = { on: true, status: 'starting', log: [] };
+  const rec = new SpeechRec();
+  rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = false; rec.maxAlternatives = 5;
+  rec.onstart = () => { if (speechTest) { speechTest.status = 'listening'; drawSpeechTest(); } };
+  rec.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (!e.results[i].isFinal) continue;
+      const alts = [...e.results[i]].map(a => a.transcript.trim()).filter(Boolean);
+      const letter = alts.map(spokenLetter).find(Boolean) || '';
+      speechTest.log.unshift({ alts, letter });
+      speechTest.log = speechTest.log.slice(0, 12);
+    }
+    drawSpeechTest();
+  };
+  rec.onerror = e => { if (speechTest && e.error !== 'no-speech' && e.error !== 'aborted') { speechTest.status = e.error; speechTest.on = false; drawSpeechTest(); } };
+  // Safari stops listening after a pause; start again while the test is on
+  rec.onend = () => { if (speechTest?.on && screen === 'parent') { try { rec.start(); } catch (err) {} } };
+  speechTest.rec = rec;
+  try { rec.start(); } catch (err) { speechTest.status = 'failed'; speechTest.on = false; }
+  // if the iPad never says it has started, say so rather than waiting forever
+  setTimeout(() => { if (speechTest?.status === 'starting') { speechTest.status = 'stuck'; drawSpeechTest(); } }, 6000);
+}
+function stopSpeechTest() { if (!speechTest) return; speechTest.on = false; try { speechTest.rec?.abort(); } catch (e) {} speechTest = null; }
+function speechTestHtml() {
+  const t = speechTest;
+  if (!t) return '';
+  const why = {
+    unsupported: 'This browser doesn’t offer speech recognition here.',
+    'not-allowed': 'Speech recognition was blocked. In the iPad’s Settings, allow the microphone and Speech Recognition for this site (and check Siri & Dictation is on), then try again.',
+    'service-not-allowed': 'The iPad won’t allow speech recognition here. If Note Beast is open from the home screen, try the same page in Safari instead.',
+    network: 'Speech recognition needs the internet, and it couldn’t connect.',
+    'audio-capture': 'No microphone could be found.',
+    failed: 'Speech recognition couldn’t start.',
+    stuck: 'Speech recognition didn’t start. If Note Beast is open from the home screen, try the same page in Safari. Otherwise check Settings: Siri & Dictation, and the microphone for this site.',
+  }[t.status];
+  if (why) return `<p class="note">${why}</p>`;
+  return `<div class="listen-panel"><span class="listen-dot"></span><span class="listen-text">${t.status === 'listening' ? `Have ${esc(N())} say note letters, one at a time: A, B, C…` : 'Starting…'}</span></div>
+    <ul class="list" id="speech-log">${speechLogHtml()}</ul>`;
+}
+const speechLogHtml = () => speechTest.log.map(x => `<li><span>Heard “${esc(x.alts[0] || '')}”${x.alts.length > 1 ? ` <small class="note">(or ${x.alts.slice(1).map(a => `“${esc(a)}”`).join(', ')})</small>` : ''}</span><strong>${x.letter ? `= ${x.letter}` : 'no letter'}</strong></li>`).join('');
+function drawSpeechTest() {
+  const box = document.getElementById('speech-test');
+  if (box) box.innerHTML = speechTestHtml();
+}
+
+/* ---------- answering out loud ('Say it') ---------- */
+// While a question takes a letter, the iPad listens; a letter Tom says counts the same as tapping that letter's button.
+const speakMode = () => state.answerWith === 'speak';
+let speech = null;  // { on, status, rec, heard }
+const speechWanted = p => !!p && !p.done && ((p.layout === 'letters' && p.choices) || (p.mode === 'row' && !p.rowKeys));
+function startSpeech() {
+  if (speech?.on) return;
+  if (!SpeechRec) { speech = { on: false, status: 'unsupported' }; return; }
+  speech = { on: true, status: 'starting', heard: '' };
+  const rec = new SpeechRec();
+  rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = false; rec.maxAlternatives = 5;
+  rec.onstart = () => { if (speech) { speech.status = 'listening'; drawSpeakBar(); } };
+  rec.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (!e.results[i].isFinal) continue;
+      // the app's own voice reading aloud mustn't count as an answer
+      if (window.speechSynthesis?.speaking) continue;
+      const alts = [...e.results[i]].map(a => a.transcript.trim()).filter(Boolean);
+      spokenAnswer(alts.map(spokenLetter).find(Boolean) || '', alts[0] || '');
+    }
+  };
+  rec.onerror = e => { if (speech && !['no-speech', 'aborted'].includes(e.error)) { speech.status = e.error; speech.on = false; drawSpeakBar(); } };
+  // Safari stops after a pause: keep listening while there are questions to answer
+  rec.onend = () => { if (speech?.on && screen === 'play' && speakMode()) { try { rec.start(); } catch (err) { speech.status = 'stopped'; speech.on = false; drawSpeakBar(); } } };
+  speech.rec = rec;
+  try { rec.start(); } catch (err) { speech.status = 'failed'; speech.on = false; }
+}
+function stopSpeech() { if (!speech) return; speech.on = false; try { speech.rec?.abort(); } catch (e) {} speech = null; }
+function spokenAnswer(letter, words) {
+  if (screen !== 'play' || !sess) return;
+  const p = sess.probs[sess.i];
+  if (!speechWanted(p)) return;
+  speech.heard = letter ? `I heard ${letter}.` : words ? `I heard “${words}”. Say a note letter.` : '';
+  if (!letter) return drawSpeakBar();
+  if (p.mode === 'row') return rowPress(letter);
+  const idx = p.choices.findIndex(c => c.t === letter);
+  if (idx >= 0) answer(idx); else drawSpeakBar();
+}
+function speakBarHtml() {
+  const why = { unsupported: 'Speaking doesn’t work on this device, so use the buttons.', 'not-allowed': 'Speaking is blocked, so use the buttons. A grown-up can allow the microphone and Speech Recognition in Settings.', 'service-not-allowed': 'The iPad won’t allow speaking here, so use the buttons. It may work in Safari instead of from the home screen.', network: 'Speaking needs the internet, so use the buttons for now.', failed: 'Speaking couldn’t start, so use the buttons.', stopped: '' }[speech?.status];
+  if (why !== undefined) return `<div class="speak-bar">${why ? `<span>${why}</span>` : ''}<button class="ghost" data-act="speak-again">🎤 Listen again</button></div>`;
+  return `<div class="speak-bar"><span class="listen-dot"></span><span>${speech?.status === 'listening' ? 'Say the letter, or tap it.' : 'Getting ready to listen…'}</span><strong>${esc(speech?.heard || '')}</strong></div>`;
+}
+function drawSpeakBar() {
+  document.getElementById('speak-bar')?.remove();
+  if (speech && sess && speech.at !== sess.i) { speech.at = sess.i; speech.heard = ''; }  // a new question starts clean
+  if (screen !== 'play' || !speakMode() || !sess || !speechWanted(sess.probs[sess.i])) return;
+  const anchor = document.getElementById('problem');
+  anchor?.insertAdjacentHTML('afterend', `<div id="speak-bar">${speakBarHtml()}</div>`);
+}
+
 /* ---------- Note Beast Challenge settings (grown-ups page) ---------- */
 const speedNote = () => `At level ${challengeLevel()}, the Note Beast now takes about ${Math.round(passSeconds())} seconds to cross. ${(state.challengeSpeed || 5) === 5 ? 'The middle setting lets each level set the speed: a little quicker after every win.' : 'Each win still makes it a little quicker from here.'}`;
 function renderChallengeSettings(seg) {
@@ -340,7 +460,7 @@ function noteProblem(p, it, k) {
   if (mode === 'row' && buildRow(p, it, k)) return;
   if (mode === 'row') mode = LEVELS[k].slice(0, p.level).some(l => l.items.some(i => i.note && parseP(i.p).letter !== p.letter)) ? 'letters' : pick(['place', 'key']);
   // the grown-ups' setting: answer with piano keys instead of letter buttons
-  if (mode === 'letters' && p.kind !== 'check' && (state.answerWith === 'mix' ? rng() < .5 : state.answerWith !== 'letters')) mode = 'key';
+  if (mode === 'letters' && p.kind !== 'check' && (state.answerWith === 'mix' ? rng() < .5 : !['letters', 'speak'].includes(state.answerWith))) mode = 'key';
   if (mode === 'key') {
     p.mode = state.realPiano && !listenMode() ? 'real' : 'key';
     delete p.lo; delete p.hi;
@@ -1710,9 +1830,11 @@ function renderParent() {
     <div class="row-btns"><span>Questions per round</span><div class="seg">${[5, 10, 15, 20].map(x => `<button data-act="per" data-n="${x}" aria-pressed="${state.perSession === x}">${x}</button>`).join('')}</div></div>
     <div class="row-btns"><span>Read aloud automatically</span>${seg('autospeak', state.autoSpeak ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">Off: nothing is spoken until you tap the speaker button. Music sounds always play.</p>
-    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['piano', 'Keys on screen'], ['mix', 'Mix of both'], ['listen', 'Real piano']])}</div>
-    <p class="note">Letter buttons: any C is answered with the C button. Keys on screen: each note must be tapped on its exact key. Mix of both: some questions use letters and some use keys, about half and half. Real piano: the microphone listens to ${esc(N())} play. It checks the letter, not the octave, because a microphone can mistake a piano’s octave. Nothing is recorded or sent anywhere.</p>
-    <div class="row-btns"><button class="ghost" data-act="mic-test">${micTest ? 'Stop the test' : 'Test the microphone'}</button></div>
+    <div class="row-btns"><span>Answer note questions with</span>${seg('answerwith', state.answerWith, [['letters', 'Letter buttons'], ['speak', 'Say it'], ['piano', 'Keys on screen'], ['mix', 'Mix of both'], ['listen', 'Real piano']])}</div>
+    <p class="note">Letter buttons: any C is answered with the C button. Keys on screen: each note must be tapped on its exact key. Mix of both: some questions use letters and some use keys, about half and half. Say it: ${esc(N())} says the letter out loud (the letter buttons still work too). It uses the iPad’s dictation, which sends the sound to Apple to turn into text; nothing is kept. Real piano: the microphone listens to ${esc(N())} play. It checks the letter, not the octave, because a microphone can mistake a piano’s octave. Nothing is recorded or sent anywhere.</p>
+    <div class="row-btns"><button class="ghost" data-act="mic-test">${micTest ? 'Stop the test' : 'Test the microphone'}</button><button class="ghost" data-act="speech-test">${speechTest?.on ? 'Stop speaking test' : 'Test speaking'}</button></div>
+    <p class="note">Test speaking tries out answering by voice: ${esc(N())} says a note letter and it shows what the iPad heard. It uses the iPad’s dictation, which sends the sound to Apple to turn into text. Nothing is kept in Note Beast.</p>
+    <div id="speech-test">${speechTestHtml()}</div>
     ${micTest ? `${mic.status === 'on' ? `<div class="listen-panel"><span class="listen-dot"></span><span class="listen-text">Play single notes, low and high.</span><strong id="heard-exact" class="heard"></strong><span class="mic-bar"><i id="mic-level"></i></span></div><ul class="list" id="mic-log">${micLog.map(x => `<li><span>${esc(x)}</span></li>`).join('')}</ul>` : `<p class="note">${mic.status === 'asking' ? 'Asking to use the microphone…' : mic.status === 'denied' ? 'The microphone is blocked. Allow it for this site in Settings, then try again.' : 'This device can’t use the microphone here.'}</p>`}` : ''}
     <div class="row-btns"><span>Real piano nearby</span>${seg('realpiano', state.realPiano ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">On: "find this key" questions and songs are played on your own piano. The app plays the right note so ${esc(N())} can check by ear. Off: tap the keys on screen.</p>
@@ -1770,6 +1892,8 @@ function render(shake) {
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
   if (screen === 'play' || screen === 'done') showBeast();
+  // answering out loud: listen while on the questions, stop everywhere else
+  if (screen === 'play' && speakMode()) { if (!speech) startSpeech(); drawSpeakBar(); } else if (speech) stopSpeech();
   if (screen === 'challenge' && game && !game.finished) { drawBeast(); updateHud(); }
 }
 // The Note Beast appears beside the feedback once there's an answer: delighted when it's right, concerned when it isn't.
@@ -1843,7 +1967,7 @@ const ACTIONS = {
   'remove-player-no'() { confirmRemove = null; render(); },
   'remove-player-yes'(d) { removePlayer(d.id); confirmRemove = null; render(); },
   parent() { screen = 'parent'; confirmWipe = false; confirmTopic = null; confirmChallengeReset = false; render(); },
-  home() { if (game) { cancelAnimationFrame(game.raf); game = null; } hush(); stopMic(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
+  home() { if (game) { cancelAnimationFrame(game.raf); game = null; } hush(); stopMic(); stopSpeechTest(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
   chip(d) { state.on[d.k] = !state.on[d.k]; save(); render(); },
   start() { startSession(); window.scrollTo?.({ top: 0 }); },
   check() { startCheck(); window.scrollTo?.({ top: 0 }); },
@@ -1851,6 +1975,7 @@ const ACTIONS = {
   'row-letter'(d) { rowPress(d.l); },
   'row-hear'() { freeSpeaker(); playRow(sess.probs[sess.i]); },
   pick(d) { answer(+d.i); },
+  'speak-again'() { stopSpeech(); startSpeech(); drawSpeakBar(); },
   say() { const p = sess?.probs[sess.i]; if (p) say(slideWords(p)); },
   replay() { const p = sess.probs[sess.i]; if (p.done) freeSpeaker(); if (p.hear) playHear(p.hear, p.onBeat); else if (p.hearP) playP(p.hearP); else if (p.hearMidi) tone(p.hearMidi); },
   'hear-intro'() { const p = sess.probs[sess.i]; if (p.intro.hear) playHear(p.intro.hear, p.intro.onBeat); else if (p.item.note) playP(p.item.p); },
@@ -1877,7 +2002,9 @@ const ACTIONS = {
   cnote(d) { const set = new Set(state.challengeNotes || []); set.has(d.n) ? set.delete(d.n) : set.add(d.n); state.challengeNotes = [...set]; save(); render(); },
   'cnote-all'() { const set = new Set(state.challengeNotes || []); for (const c of ['t', 'b', 'a', 'n']) if (challengeClefOk(c)) CHALLENGE_CHOICES[c].forEach(p => set.add(`${c}:${p}`)); state.challengeNotes = [...set]; save(); render(); },
   'cnote-none'() { state.challengeNotes = (state.challengeNotes || []).filter(x => !challengeClefOk(x.split(':')[0])); save(); render(); },
+  'speech-test'() { if (speechTest?.on) stopSpeechTest(); else startSpeechTest(); render(); },
   async 'mic-test'() {
+    stopSpeechTest();
     micTest = !micTest; micLog = [];
     if (micTest) await startMic(); else stopMic();
     render();
