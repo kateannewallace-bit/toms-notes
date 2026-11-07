@@ -332,6 +332,34 @@ function loadBull(a) {
 // 'happy' plays the next success bellow in turn; 'sad' plays the Hereford bellow.
 // Until they've loaded, a made-up grunt stands in: two quick rising grunts, or one long sinking groan.
 // Either plays alongside other sounds and never stops them.
+// Theseus's sword: a whoosh through the air, then a ringing clang and a thump.
+function slash(when = 0) {
+  const a = audioReady();
+  if (!a) return;
+  const t0 = a.currentTime + when + .02;
+  const n = a.createBuffer(1, Math.ceil(a.sampleRate * .35), a.sampleRate), d = n.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = n; bp.type = 'bandpass'; bp.Q.value = 2;
+  bp.frequency.setValueAtTime(500, t0); bp.frequency.exponentialRampToValueAtTime(3000, t0 + .3);
+  g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.5, t0 + .22); g.gain.exponentialRampToValueAtTime(.0001, t0 + .34);
+  src.connect(bp); bp.connect(g); g.connect(masterGain); src.start(t0);
+  // the clang: a few bright, unrelated tones that ring and fade, like metal
+  const t1 = t0 + .32;
+  for (const [f, v] of [[1870, .16], [2630, .1], [3410, .07]]) {
+    const os = a.createOscillator(), og = a.createGain();
+    os.type = 'sine'; os.frequency.value = f;
+    og.gain.setValueAtTime(.0001, t1); og.gain.exponentialRampToValueAtTime(v, t1 + .005); og.gain.exponentialRampToValueAtTime(.0001, t1 + .7);
+    os.connect(og); og.connect(masterGain); os.start(t1); os.stop(t1 + .75); liveNodes.push(os);
+  }
+  // the thump as he hits the ground
+  const os = a.createOscillator(), og = a.createGain(), t2 = t0 + 1.1;
+  os.type = 'sine'; os.frequency.setValueAtTime(110, t2); os.frequency.exponentialRampToValueAtTime(40, t2 + .3);
+  og.gain.setValueAtTime(.0001, t2); og.gain.exponentialRampToValueAtTime(.8, t2 + .01); og.gain.exponentialRampToValueAtTime(.0001, t2 + .4);
+  os.connect(og); og.connect(masterGain); os.start(t2); os.stop(t2 + .45);
+  liveNodes.push(src, os);
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + 1.7) * 1000);
+}
 // A big, sulky sigh: a breath in, then a long breath out that sinks, with a low grumble under it.
 function sigh(when = 0) {
   const a = audioReady();

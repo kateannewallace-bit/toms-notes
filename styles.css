@@ -443,4 +443,32 @@ body.game-mode .board > * { flex: none; }
 .cnote span { font-size: .85rem; font-weight: 700; }
 .cnote[aria-pressed="false"] { opacity: .45; }
 .cnote[aria-pressed="true"] { border-color: #111; box-shadow: 0 0 0 2px #111 inset; }
+/* losing: Theseus runs in, swings, and the Note Beast topples over, dizzy */
+.hero { position: absolute; bottom: 0; left: -30%; height: 76%; transform: translateX(-50%); z-index: 2; pointer-events: none; transition: left 1.3s cubic-bezier(.3, .7, .4, 1); }
+.hero svg { display: block; height: 100%; width: auto; }
+.hero.in { left: 24%; }
+.hero.in:not(.swing) .theseus { animation: bob .28s ease-in-out infinite alternate; }
+.sword-arm { transform-box: view-box; transform-origin: 146px 158px; transform: rotate(-70deg); }
+.hero.swing .sword-arm { animation: swing .8s ease-in-out forwards; }
+@keyframes swing { 0% { transform: rotate(-70deg); } 45% { transform: rotate(160deg); } 62% { transform: rotate(-80deg); } 100% { transform: rotate(-60deg); } }
+.hero.victory .sword-arm { animation: none; transform: rotate(180deg); transition: transform .35s ease-out; }
+.hero.victory .theseus { animation: hero-hop .4s ease-in-out 3 alternate; }
+@keyframes hero-hop { from { transform: translateY(0); } to { transform: translateY(-6%); } }
+.runner.felled .beast-figure { transform-origin: 50% 97%; transform: translateY(-9%) rotate(80deg) scale(.8); transition: transform .9s cubic-bezier(.55, 0, .9, .5); }
+/* winning: the Hydra comes to the party */
+.party { position: absolute; bottom: 0; left: 120%; height: 84%; transform: translateX(-50%); z-index: 2; pointer-events: none; transition: left 1.2s cubic-bezier(.3, .7, .4, 1); }
+.party svg { display: block; height: 100%; width: auto; }
+.party.in { left: 74%; }
+.hh { transform-box: fill-box; transform-origin: 70% 100%; animation: hh-bob .45s ease-in-out infinite alternate; }
+.hh1 { animation-delay: .12s; } .hh2 { animation-delay: .3s; } .hh3 { animation-delay: .06s; } .hh4 { animation-delay: .22s; }
+@keyframes hh-bob { from { transform: rotate(-7deg); } to { transform: rotate(6deg) translateY(-4px); } }
+.balloons { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+.balloons i { position: absolute; bottom: -90px; width: 44px; height: 54px; border-radius: 50% 50% 46% 46%; border: 2.5px solid #2a1a10; animation: balloon-up 4s ease-out forwards; }
+.balloons i::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: 46px; background: #2a1a10; }
+@keyframes balloon-up { from { transform: translateY(0); } to { transform: translateY(-560px); } }
+.game-over .party-pair:has(.hydra), .game-over .hero-pair { width: auto; flex-direction: row; align-items: flex-end; justify-content: center; gap: 18px; }
+.party-pair .beast-art, .hero-pair .beast-art { width: clamp(110px, 16vw, 150px); }
+.party-pair svg.hydra, .hero-pair svg.theseus { height: clamp(130px, 18vw, 170px); width: auto; }
+.hero-pair .theseus .sword-arm { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .hero.in:not(.swing) .theseus, .hero.victory .theseus, .hh, .balloons i { animation: none; } }
 

@@ -10,10 +10,11 @@ function beastHead(mood) {
     sad: '<path d="M66 88 L92 80" /><path d="M134 88 L108 80" />',
     aghast: '<path d="M62 78 L93 89" /><path d="M138 78 L107 89" /><path d="M97 80 L97 90 M103 80 L103 90" stroke-width="2.5" />',
     dizzy: '<path d="M66 80 Q79 74 92 80" /><path d="M134 80 Q121 74 108 80" />',
+    defeated: '<path d="M66 82 Q79 78 92 84" /><path d="M134 82 Q121 78 108 84" />',
   }[mood];
   const eyes = mood === 'happy'
     ? `<circle cx="80" cy="100" r="12" fill="#fff"/><circle cx="120" cy="100" r="12" fill="#fff"/><circle cx="81" cy="101" r="6" fill="${ink}"/><circle cx="119" cy="101" r="6" fill="${ink}"/><circle cx="83" cy="98" r="2.2" fill="#fff" stroke="none"/><circle cx="121" cy="98" r="2.2" fill="#fff" stroke="none"/>`
-    : mood === 'dizzy'
+    : mood === 'dizzy' || mood === 'defeated'
     ? '<path d="M72 92 L88 108 M88 92 L72 108 M112 92 L128 108 M128 92 L112 108" fill="none" stroke-width="4"/>'
     : mood === 'sad'
     ? `<circle cx="80" cy="102" r="11" fill="#fff"/><circle cx="120" cy="102" r="11" fill="#fff"/><circle cx="80" cy="106" r="5" fill="${ink}"/><circle cx="120" cy="106" r="5" fill="${ink}"/><path d="M69 99 Q80 90 91 99 Z M109 99 Q120 90 131 99 Z" fill="${fur}" stroke-width="2.5"/>`
@@ -29,11 +30,13 @@ function beastHead(mood) {
     sad: '<path d="M86 168 Q100 158 114 168" fill="none"/>',
     aghast: '<path d="M78 172 Q80 152 100 154 Q120 152 122 172 Q100 166 78 172 Z" fill="#7a2c2c"/><path d="M84 158 Q100 154 116 158 L115 163 Q100 160 85 163 Z" fill="#fff" stroke-width="2"/>',
     dizzy: '<path d="M82 164 q9 -9 18 0 q9 9 18 0" fill="none"/>',
+    defeated: '<path d="M84 166 Q100 158 116 166" fill="none"/><path d="M104 165 Q106 180 113 178 Q118 174 112 163" fill="#e88a8a"/>',
   }[mood];
   const extra = {
     happy: '<circle cx="61" cy="126" r="8" fill="#f0a49a" opacity=".75" stroke="none"/><circle cx="139" cy="126" r="8" fill="#f0a49a" opacity=".75" stroke="none"/>',
     worried: '<path d="M151 70 Q156 80 151 85 Q146 80 151 70 Z" fill="#9fcbe9" stroke-width="2"/>',
     aghast: '',
+    defeated: '',
     sad: '<path d="M134 112 Q139 122 134 127 Q129 122 134 112 Z" fill="#9fcbe9" stroke-width="2"/>',
     scowl: '<circle cx="61" cy="126" r="9" fill="#d9534f" opacity=".45" stroke="none"/><circle cx="139" cy="126" r="9" fill="#d9534f" opacity=".45" stroke="none"/><path d="M34 44 q-9 -9 0 -18 q9 -9 0 -18 M166 44 q9 -9 0 -18 q-9 -9 0 -18" fill="none" stroke="#9aa3a8" stroke-width="4"/>',
     dizzy: '<path d="M60 24 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1 Z M140 18 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1 Z" fill="#f3d77a" stroke-width="2"/>',
@@ -106,5 +109,64 @@ function beastFigure(mood, pose, placard = '', opts = {}) {
   ${arms}
   <g transform="translate(20 0)">${beastHead(mood)}${opts.laurel ? beastLaurel() : ''}</g>
   ${front}
+</svg>`;
+}
+
+/* Theseus, the hero from the old story, who comes into the labyrinth when the Challenge is lost (if a grown-up picks that ending).
+   Tom asked for this: Theseus slays the Note Beast with a sword. It stays cartoonish: a swing, a clang, X eyes, no blood.
+   He faces right, toward the Note Beast. The sword arm swings on CSS (.sword-arm), pivoting at the shoulder. */
+function theseusSvg() {
+  const ink = BEAST_INK, skin = '#f0c9a0', bronze = '#d4a640', red = '#c0392b';
+  return `<svg class="theseus" viewBox="0 0 220 380" role="img" aria-label="Theseus, the hero, with a sword and shield">
+  <g stroke="${ink}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+    <g class="t-legs">
+      <rect x="78" y="262" width="22" height="92" rx="9" fill="${skin}"/><rect x="118" y="262" width="22" height="92" rx="9" fill="${skin}"/>
+      <path d="M78 330 H100 M78 342 H100 M118 330 H140 M118 342 H140" stroke="#7a4a24" stroke-width="4"/>
+      <rect x="74" y="350" width="32" height="12" rx="5" fill="#7a4a24"/><rect x="114" y="350" width="32" height="12" rx="5" fill="#7a4a24"/>
+    </g>
+    <path d="M70 150 L150 150 L162 272 L58 272 Z" fill="#fbf8f0"/>
+    <path d="M58 272 L162 272 L160 260 L60 260 Z" fill="${red}"/>
+    <rect x="66" y="196" width="88" height="10" fill="#7a4a24"/>
+    <path d="M150 150 L176 158" stroke="${skin}" stroke-width="0"/>
+    <circle cx="110" cy="104" r="34" fill="${skin}"/>
+    <circle cx="122" cy="102" r="4" fill="${ink}" stroke="none"/>
+    <path d="M114 92 L130 96" stroke-width="4"/>
+    <path d="M114 120 Q124 126 134 118" fill="none"/>
+    <path d="M74 104 C70 60 150 56 146 100 L146 110 L132 106 L130 84 L92 84 L90 116 L76 120 Z" fill="${bronze}"/>
+    <path d="M78 66 C86 22 138 18 150 60 C138 44 96 42 78 66 Z" fill="${red}"/>
+    <path d="M86 52 L92 40 M100 44 L104 30 M116 42 L118 28 M132 46 L138 34" stroke="#8e2219" stroke-width="3"/>
+  </g>
+  <g class="shield" stroke="${ink}" stroke-width="3.5"><circle cx="78" cy="196" r="46" fill="${bronze}"/><circle cx="78" cy="196" r="34" fill="none" stroke="#a87f22" stroke-width="3"/><path d="M62 216 L78 174 L94 216" fill="none" stroke="${red}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g class="sword-arm">
+    <path d="M146 158 L146 214" stroke="${ink}" stroke-width="25" stroke-linecap="round"/><path d="M146 158 L146 214" stroke="${skin}" stroke-width="18" stroke-linecap="round"/>
+    <g stroke="${ink}" stroke-width="3" stroke-linejoin="round"><rect x="132" y="216" width="28" height="9" rx="3" fill="${bronze}"/><path d="M140 225 L152 225 L150 300 L146 312 L142 300 Z" fill="#dfe6ea"/><circle cx="146" cy="214" r="10" fill="${skin}"/></g>
+  </g>
+</svg>`;
+}
+
+/* The Hydra: a friendly, many-headed party guest who comes to celebrate when the Challenge is won.
+   Five heads on long necks, each in a party hat, all looking left toward the Note Beast. */
+function hydraSvg(o = {}) {
+  const ink = BEAST_INK, green = '#5fa35a', light = '#a8d69a', dark = '#3f7a3c';
+  const hats = ['#e0517a', '#f3c94a', '#5aa0e0', '#9b6bd1', '#f08a3c'];
+  const heads = [[60, 92], [104, 46], [158, 26], [212, 50], [252, 100]];
+  const neck = ([x, y]) => { const d = `M160 300 C160 240 ${x + 20} ${y + 90} ${x + 6} ${y + 18}`; return `<path d="${d}" fill="none" stroke="${ink}" stroke-width="31" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${green}" stroke-width="24" stroke-linecap="round"/>`; };
+  const head = ([x, y], i) => `<g class="hh hh${i}">
+    <path d="M${x + 26} ${y + 6} C${x + 26} ${y - 22} ${x - 10} ${y - 24} ${x - 22} ${y - 4} L${x - 40} ${y + 6} C${x - 46} ${y + 16} ${x - 38} ${y + 26} ${x - 26} ${y + 24} L${x + 4} ${y + 30} C${x + 18} ${y + 30} ${x + 26} ${y + 20} ${x + 26} ${y + 6} Z" fill="${green}" stroke="${ink}" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M${x - 40} ${y + 14} Q${x - 22} ${y + 26} ${x - 4} ${y + 18}" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="${x - 36}" cy="${y + 4}" r="2.5" fill="${ink}"/>
+    <circle cx="${x - 6}" cy="${y - 6}" r="9" fill="#fff" stroke="${ink}" stroke-width="3"/><circle cx="${x - 9}" cy="${y - 6}" r="4.5" fill="${ink}"/>
+    <path d="M${x - 2} ${y - 18} L${x + 22} ${y - 66} L${x + 22} ${y - 10} Z" fill="${hats[i]}" stroke="${ink}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M${x + 6} ${y - 28} L${x + 22} ${y - 34} M${x + 12} ${y - 46} L${x + 22} ${y - 50}" stroke="#fff" stroke-width="4"/>
+    <circle cx="${x + 22}" cy="${y - 68}" r="6" fill="#fff" stroke="${ink}" stroke-width="2.5"/>
+  </g>`;
+  return `<svg class="hydra" viewBox="0 -50 320 430" role="img" aria-label="The Hydra, with five heads in party hats">
+  <path d="M250 330 C300 330 316 290 296 262 C288 280 270 296 240 300" fill="${green}" stroke="${ink}" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="104" y="318" width="30" height="46" rx="10" fill="${green}" stroke="${ink}" stroke-width="3.5"/><rect x="186" y="318" width="30" height="46" rx="10" fill="${green}" stroke="${ink}" stroke-width="3.5"/>
+  ${heads.map(neck).join('')}
+  <ellipse cx="160" cy="300" rx="96" ry="54" fill="${green}" stroke="${ink}" stroke-width="3.5"/>
+  <ellipse cx="160" cy="312" rx="62" ry="32" fill="${light}" stroke="none"/>
+  <path d="M90 280 l8 -10 M120 266 l8 -10 M200 266 l8 -10 M230 280 l8 -10" stroke="${dark}" stroke-width="4" stroke-linecap="round"/>
+  ${heads.map(head).join('')}
 </svg>`;
 }

@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -231,6 +231,8 @@ function renderChallengeSettings(seg) {
     <p class="note">These are for ${esc(N())}'s Challenge only.</p>
     <div class="row-btns"><span>Clefs</span><div class="seg">${['t', 'b', 'a', 'n'].map(c => `<button data-act="cclef" data-v="${c}" aria-pressed="${challengeClefOk(c)}">${CLEF_NAMES[c].replace(' clef', '')}</button>`).join('')}</div></div>
     <p class="note">Tap to switch each clef on or off. Treble and bass to start; alto and tenor are the C clefs, whose middle points at Middle C.</p>
+    <div class="row-btns"><span>Endings</span>${seg('loseend', state.loseEnding === 'theseus' ? 'theseus' : 'sulk', [['sulk', 'Standard'], ['theseus', 'Theseus and the Hydra']])}</div>
+    <p class="note">Standard: winning, the Note Beast cheers and gets a golden laurel wreath; losing, the Note Beast sits down to sulk in the labyrinth under a rain cloud. Theseus and the Hydra: winning, the laurel wreath and then a party with the Hydra; losing, Theseus, the hero from the old story, runs in and slays the Note Beast with his sword (cartoonish, no blood).</p>
     <div class="row-btns"><span>Notes</span>${seg('cmode', chosen ? 1 : 0, [[0, 'Automatic'], [1, 'Choose notes']])}</div>
     <p class="note">${chosen ? 'Only the notes picked below come up, at every level. Levels still make him run faster.' : 'Automatic: the landmark notes (Middle C, treble G, bass F) at first, then two more of the notes learned in Out from Middle C at each level from level 3. On the alto and tenor clefs it starts at Middle C and adds the notes either side, a step further each level.'}</p>
     ${chosen ? `${showClefs.map(c => `<h3 class="cnote-clef">${CLEF_NAMES[c]}</h3><div class="cnotes">${CHALLENGE_CHOICES[c].map(p => chip(c, p)).join('')}</div>`).join('')}
@@ -1864,6 +1866,7 @@ const ACTIONS = {
   answerwith(d) { state.answerWith = d.v; save(); render(); },
   cclef(d) { const on = challengeClefs(), next = on.includes(d.v) ? on.filter(c => c !== d.v) : [...on, d.v]; if (next.length) { state.challengeClefs = next; save(); } render(); },
   cclefs(d) { state.cClefs = d.v === '1'; save(); render(); },
+  loseend(d) { state.loseEnding = d.v; save(); render(); },
   // switching to Choose starts from the notes Automatic would ask now, so nothing changes until a note is tapped
   cmode(d) { state.challengeNotes = d.v === '1' ? autoChallengePool().map(([c, p]) => `${c}:${p}`) : null; save(); render(); },
   cnote(d) { const set = new Set(state.challengeNotes || []); set.has(d.n) ? set.delete(d.n) : set.add(d.n); state.challengeNotes = [...set]; save(); render(); },
@@ -1881,7 +1884,7 @@ const ACTIONS = {
   'topic-reset-yes'(d) { resetTopic(d.k); confirmTopic = null; save(); render(); },
   wipe() { confirmWipe = true; render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },
