@@ -501,3 +501,19 @@ body.game-mode .board > * { flex: none; }
 .speak-bar strong { min-width: 6em; }
 .seg.seg-wrap { display: flex; flex-wrap: wrap; }
 .seg.seg-wrap button { white-space: nowrap; flex: 1 0 auto; }
+/* Note Stories */
+.story-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.story-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; border: 2px solid var(--chalk); border-radius: 10px; padding: 14px 16px; background: #fff; }
+.story-name { font-weight: 700; font-size: 1.15rem; }
+.story-saying { font-size: 1.3rem; font-weight: 900; }
+.story-best { font-size: .9rem; opacity: .7; }
+.saying { text-align: center; font-size: clamp(1.6rem, 5vw, 2.4rem); margin: 10px 0; letter-spacing: .01em; }
+.saying span { padding: 0 .15em; border-radius: 6px; transition: background .2s; }
+.saying span.lit { background: #f3d77a; }
+.saying b { font-weight: 900; text-decoration: underline; text-underline-offset: .15em; }
+.story-w { fill: #111; font-family: var(--font); }
+.story-w .story-l { font-weight: 900; }
+.story-w.lit { fill: var(--blue); font-weight: 700; }
+.story-done { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.story-done .stars { justify-content: center; }
+

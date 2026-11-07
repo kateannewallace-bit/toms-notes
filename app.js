@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, stories: {}, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -1526,6 +1526,10 @@ function renderHome() {
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section class="challenge-card">
+    <div><h2>Note Stories</h2><p class="note">Learn the sayings that help you remember the notes: Every Good Boy Does Fine, FACE, and more.</p></div>
+    <button class="start" data-act="stories">Open</button>
+  </section>
+  <section class="challenge-card">
     <div><h2>Note Beast Challenge</h2><p class="note">Note Beast runs past with a note on his sign. Play it before he runs off! Catch ${CHALLENGE_GOAL} to win. Level ${challengeLevel()}${state.challenge?.wins ? `, after ${state.challenge.wins} win${state.challenge.wins > 1 ? 's' : ''}` : ''}.</p></div>
     <button class="start" data-act="challenge">Play</button>
   </section>
@@ -1557,8 +1561,8 @@ function renderMap() {
   <p class="note">The notes on each staff, named. The blue note is Middle C. Tap any note to hear it.</p>
   <section><h2>Treble clef</h2><div class="map-scroll">${row('t', 'C4', 'G5')}</div></section>
   <section><h2>Bass clef</h2><div class="map-scroll">${row('b', 'F2', 'C4')}</div></section>
-  ${state.cClefs ? `<section><h2>Alto clef</h2><p class="note">The middle of the clef points at Middle C, on the middle line.</p><div class="map-scroll">${row('a', 'E3', 'A4')}</div></section>
-  <section><h2>Tenor clef</h2><p class="note">The middle of the clef points at Middle C, on the 4th line.</p><div class="map-scroll">${row('n', 'C3', 'F4')}</div></section>` : ''}
+  ${state.cClefs ? `<section><h2>Alto clef</h2><p class="note">The middle of the clef points at Middle C, on the middle line. ${esc(CLEF_WHO.a)}</p><div class="map-scroll">${row('a', 'E3', 'A4')}</div></section>
+  <section><h2>Tenor clef</h2><p class="note">The middle of the clef points at Middle C, on the 4th line. ${esc(CLEF_WHO.n)}</p><div class="map-scroll">${row('n', 'C3', 'F4')}</div></section>` : ''}
   <details class="more-notes"><summary>More notes: the ledger lines</summary>
     <section><h2>High treble notes</h2><div class="map-scroll">${row('t', 'A5', 'E6')}</div></section>
     <section><h2>Low treble notes</h2><div class="map-scroll">${row('t', 'F3', 'B3')}</div></section>
@@ -1840,7 +1844,7 @@ function renderParent() {
     <p class="note">On: "find this key" questions and songs are played on your own piano. The app plays the right note so ${esc(N())} can check by ear. Off: tap the keys on screen.</p>
     <div class="row-btns"><span>Speaking speed</span>${seg('speed', state.speed, [['normal', 'Normal'], ['slow', 'Slower']])}</div>
     <div class="row-btns"><span>Alto and tenor clefs</span>${seg('cclefs', state.cClefs ? 1 : 0, [[1, 'Show'], [0, 'Hide']])}</div>
-    <p class="note">Show: the Note Map adds the alto and tenor clefs (the C clefs). They can also be switched on for the Challenge below.</p>
+    <p class="note">Show: the Note Map and Note Stories add the alto clef (read by violas) and the tenor clef (read by cellos, bassoons and trombones for high notes). They can also be switched on for the Challenge below.</p>
   </section>
   ${renderChallengeSettings(seg)}
   <section>
@@ -1888,7 +1892,7 @@ function render(shake) {
   // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
   document.body.classList.toggle('song-mode', screen === 'song');
   document.body.classList.toggle('game-mode', screen === 'challenge');
-  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : renderHome();
+  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : screen === 'stories' ? renderStories() : screen === 'story' ? renderStory() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
   if (screen === 'play' || screen === 'done') showBeast();
@@ -2041,6 +2045,7 @@ app.addEventListener('click', e => {
     audioReady(); playP(note.dataset.play, 1.2);
     if (screen === 'play' && sess?.probs[sess.i]?.mode === 'findC') findCTap(note.dataset.play);
     if (screen === 'map') lightUp(note);
+    if (screen === 'story') storyTap(note.dataset.play);
     return;
   }
   if (!b || b.disabled) return;
