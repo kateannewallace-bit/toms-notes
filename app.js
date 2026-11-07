@@ -126,7 +126,7 @@ function mergeFamily(remote) {
   return { changed, newerHere };
 }
 let micTest = false, micLog = [], confirmRemove = null;
-let screen = 'home', sess = null, lastChanges = [], song = null, confirmWipe = false, confirmTopic = null;
+let screen = 'home', sess = null, lastChanges = [], song = null, confirmWipe = false, confirmTopic = null, confirmChallengeReset = false;
 const sync = { code: '', key: '', status: 'off', lastAt: 0, saving: false, dirty: false, error: '' };
 try { sync.code = localStorage.getItem(CODE_KEY) || ''; } catch (e) {}
 
@@ -241,6 +241,9 @@ function renderChallengeSettings(seg) {
     ${chosen ? `${showClefs.map(c => `<h3 class="cnote-clef">${CLEF_NAMES[c]}</h3><div class="cnotes">${CHALLENGE_CHOICES[c].map(p => chip(c, p)).join('')}</div>`).join('')}
     <div class="row-btns"><button class="link" data-act="cnote-all">Pick all</button><button class="link" data-act="cnote-none">Clear</button></div>
     ${none ? '<p class="note">Nothing picked for these clefs yet, so the landmark notes come up for now.</p>' : ''}` : ''}
+    <h3 class="cnote-clef">Challenge progress</h3>
+    <p class="note">${esc(N())} is on level ${challengeLevel()}${state.challenge?.plays ? `, after ${state.challenge.wins || 0} win${state.challenge.wins === 1 ? '' : 's'} in ${state.challenge.plays} game${state.challenge.plays === 1 ? '' : 's'}` : ''}. Resetting starts the Challenge again at level 1. It keeps everything else: the lessons, songs and these settings.</p>
+    <div class="row-btns">${confirmChallengeReset ? `<button class="ghost danger" data-act="creset-yes">Yes, start the Challenge over</button><button class="link" data-act="creset-no">Cancel</button>` : `<button class="ghost danger" data-act="creset">Reset Challenge progress</button>`}</div>
   </section>`;
 }
 
@@ -432,6 +435,7 @@ function findCStaff(p) {
     const on = c => p.placed.map(o => o[0] === c ? { p: o[1], d: 'w', cls: cls(o[1]) } : { skip: 1, d: 'w' });
     return grandSvg({ S: 17, width: 440, t: on('t'), b: on('b'), even: true, cl: 'findc-grand' });
   }
+  if (p.plain) return plainStaff(p.notes.map(x => ({ p: x, d: 'w', cls: cls(x) })), { S: 22, width: 360 });
   const lo = p.clef === 't' ? stepOf('E3') : CLEF.b.bottom, hi = p.clef === 't' ? topOf('t') : stepOf('A4');
   return staffSvg({ clef: p.clef, S: 22, width: 360, even: true, items: p.notes.map(x => ({ p: x, d: 'w', cls: cls(x) })),
     lo, hi, label: `A ${CLEF[p.clef].name} staff with ${p.notes.length} notehead${p.notes.length > 1 ? 's' : ''}` });
@@ -462,7 +466,7 @@ function findCTap(pitch) {
   }
   if (p.tapped.includes(pitch)) return;
   p.tapped.push(pitch); p.misses++;
-  p.lastWrong = `That one is ${letterOf(stepOf(pitch))}. ${p.answerText()}`;
+  p.lastWrong = p.wrongText ? p.wrongText() : `That one is ${letterOf(stepOf(pitch))}. ${p.answerText()}`;
   render(true);
 }
 // Staff basics: the staff, higher and lower, the musical alphabet, the clefs and the grand staff.
@@ -491,26 +495,23 @@ function basicProblem(p, it) {
     let b = a;
     while (Math.abs(b - a) < 2) b = E4 - 1 + Math.floor(rng() * 10);
     const want = kind === 'higher' ? Math.max(a, b) : Math.min(a, b);
-    p.vis = plainStaff([{ p: pitchOf(a), d: 'w' }, { p: pitchOf(b), d: 'w' }]);
-    p.prompt = `Which note is ${kind}?`;
-    p.choices = two(['The first note', a === want], ['The second note', b === want]);
-    p.hear = [{ midi: whiteMidi(a), beats: 1 }, { midi: whiteMidi(b), beats: 1 }];
+    // answered by touching the note itself, the same way as "Tap Middle C"
+    p.mode = 'findC'; p.step = 'note'; p.plain = true;
+    p.notes = [pitchOf(a), pitchOf(b)]; p.target = pitchOf(want); p.tapped = []; p.misses = 0;
+    p.prompt = `Touch the ${kind} note.`;
     p.answerText = () => `The ${a === want ? 'first' : 'second'} note sits ${kind} on the staff, so it sounds ${kind}.`;
-  } else if (kind === 'next' || kind === 'before') {
-    const i = Math.floor(rng() * 7), l = LETTERS[(i + 5) % 7], ans = LETTERS[(i + 5 + (kind === 'next' ? 1 : -1) + 7) % 7];
-    p.prompt = `Which letter comes ${kind === 'next' ? 'after' : 'before'} ${l}?`;
-    p.layout = 'letters';
-    p.choices = LETTER_CHOICES().map(x => ({ t: x, ok: x === ans }));
-    p.answerText = () => kind === 'next' ? `${l}, then ${ans}.${l === 'G' ? ' After G, the letters start again at A.' : ''}` : `${ans}, then ${l}.${l === 'A' ? ' Before A comes G: the letters go round.' : ''}`;
-  } else if (kind === 'stepUp') {
-    const s = E4 - 2 + Math.floor(rng() * 9), up = rng() < .6, t = s + (up ? 1 : -1);
+    p.wrongText = () => `That one is ${kind === 'higher' ? 'lower' : 'higher'}. Touch the ${kind} note.`;
+  } else if (kind === 'stepUp' || kind === 'next' || kind === 'before') {
+    // The musical alphabet, always read on the staff: a named note, and the blue note one step up or down from it.
+    // 'next' always steps up and 'before' always steps down (Katie: plain "which letter comes after B?" isn't music).
+    const s = E4 - 2 + Math.floor(rng() * 9), up = kind === 'next' ? true : kind === 'before' ? false : rng() < .6, t = s + (up ? 1 : -1);
     p.vis = staffSvg({ clef: 't', S: 18, width: 340, even: true, lo: stepOf('C4'), hi: stepOf('A5'), items: [{ p: pitchOf(s), d: 'w' }, { p: pitchOf(t), d: 'w', cls: 'now' }],
-      extra: ({ x, Y, S }) => `<text class="walk final" x="${x[0]}" y="${Y(Math.min(s, t)) + S * 2.2}" text-anchor="middle" font-size="${S * 1.2}">${letterOf(s)}</text>` });
+      extra: ({ x, Y, S }) => `<text class="walk final" x="${x[0]}" y="${Y(Math.min(s, t, CLEF.t.bottom)) + S * 2.2}" text-anchor="middle" font-size="${S * 1.2}">${letterOf(s)}</text>` });
     p.prompt = `The first note is ${letterOf(s)}. The blue note is one step ${up ? 'up' : 'down'}. What is it?`;
     p.layout = 'letters';
     p.choices = LETTER_CHOICES().map(x => ({ t: x, ok: x === letterOf(t) }));
     p.hearP = pitchOf(t);
-    p.answerText = () => `One step ${up ? 'up' : 'down'} from ${letterOf(s)} is ${letterOf(t)}.`;
+    p.answerText = () => `One step ${up ? 'up' : 'down'} from ${letterOf(s)} is ${letterOf(t)}.${up && letterOf(s) === 'G' ? ' After G, the letters start again at A.' : !up && letterOf(s) === 'A' ? ' Below A comes G: the letters go round.' : ''}`;
   } else if (kind === 'trebleName' || kind === 'bassName') {
     const c = kind === 'trebleName' ? 't' : 'b';
     p.vis = clefOnly(c);
@@ -1841,7 +1842,7 @@ const ACTIONS = {
   'remove-player'(d) { confirmRemove = d.id; render(); },
   'remove-player-no'() { confirmRemove = null; render(); },
   'remove-player-yes'(d) { removePlayer(d.id); confirmRemove = null; render(); },
-  parent() { screen = 'parent'; confirmWipe = false; confirmTopic = null; render(); },
+  parent() { screen = 'parent'; confirmWipe = false; confirmTopic = null; confirmChallengeReset = false; render(); },
   home() { if (game) { cancelAnimationFrame(game.raf); game = null; } hush(); stopMic(); micTest = false; screen = 'home'; song = null; render(); window.scrollTo?.({ top: 0 }); },
   chip(d) { state.on[d.k] = !state.on[d.k]; save(); render(); },
   start() { startSession(); window.scrollTo?.({ top: 0 }); },
@@ -1887,6 +1888,9 @@ const ACTIONS = {
   'topic-reset-no'() { confirmTopic = null; render(); },
   'topic-reset-yes'(d) { resetTopic(d.k); confirmTopic = null; save(); render(); },
   wipe() { confirmWipe = true; render(); },
+  creset() { confirmChallengeReset = true; render(); },
+  'creset-no'() { confirmChallengeReset = false; render(); },
+  'creset-yes'() { state.challenge = { wins: 0, plays: 0 }; confirmChallengeReset = false; save(); render(); },
   'wipe-no'() { confirmWipe = false; render(); },
   'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
