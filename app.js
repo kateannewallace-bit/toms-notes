@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -45,6 +45,7 @@ function normalize(s) {
   s.on = Object.assign({}, s.on);
   s.mastered = Object.assign({}, s.mastered);
   // Staff basics arrived after Tom had started: it switches on once, and Out from Middle C waits for it.
+  if (!Array.isArray(s.challengeClefs)) s.challengeClefs = s.challengeClefs === 't' ? ['t'] : s.challengeClefs === 'b' ? ['b'] : ['t', 'b'];
   if (!hadBasics) { s.basicsAdded = 1; s.on.basics = true; }
   if (!hadFindC) { s.findcAdded = 1; s.on.findc = true; }
   if (!hadClefNotes) { s.clefnotesAdded = 1; s.on.clefnotes = true; }
@@ -217,6 +218,25 @@ function say(text) {
     u.rate = state.speed === 'slow' ? 0.8 : 0.95;
     speechSynthesis.speak(u);
   } catch (e) {}
+}
+
+/* ---------- Note Beast Challenge settings (grown-ups page) ---------- */
+function renderChallengeSettings(seg) {
+  const chosen = !!state.challengeNotes, picked = new Set(state.challengeNotes || []);
+  const showClefs = ['t', 'b', 'a', 'n'].filter(challengeClefOk);
+  const chip = (c, p) => { const id = `${c}:${p}`; return `<button class="cnote" data-act="cnote" data-n="${id}" aria-pressed="${picked.has(id)}" aria-label="${p === 'C4' ? 'Middle C' : p}">${staffSvg({ clef: c, S: 8, width: 100, noteX: 72, lo: stepOf(CHALLENGE_CHOICES[c][0]), hi: stepOf(CHALLENGE_CHOICES[c].at(-1)), items: [{ p, d: 'w' }] })}<span>${p === 'C4' ? 'Middle C' : p[0]}</span></button>`; };
+  const none = chosen && !challengePool().some(([c, p]) => picked.has(`${c}:${p}`));
+  return `<section>
+    <h2>Note Beast Challenge</h2>
+    <p class="note">These are for ${esc(N())}'s Challenge only.</p>
+    <div class="row-btns"><span>Clefs</span><div class="seg">${['t', 'b', 'a', 'n'].map(c => `<button data-act="cclef" data-v="${c}" aria-pressed="${challengeClefOk(c)}">${CLEF_NAMES[c].replace(' clef', '')}</button>`).join('')}</div></div>
+    <p class="note">Tap to switch each clef on or off. Treble and bass to start; alto and tenor are the C clefs, whose middle points at Middle C.</p>
+    <div class="row-btns"><span>Notes</span>${seg('cmode', chosen ? 1 : 0, [[0, 'Automatic'], [1, 'Choose notes']])}</div>
+    <p class="note">${chosen ? 'Only the notes picked below come up, at every level. Levels still make him run faster.' : 'Automatic: the landmark notes (Middle C, treble G, bass F) at first, then two more of the notes learned in Out from Middle C at each level from level 3. On the alto and tenor clefs it starts at Middle C and adds the notes either side, a step further each level.'}</p>
+    ${chosen ? `${showClefs.map(c => `<h3 class="cnote-clef">${CLEF_NAMES[c]}</h3><div class="cnotes">${CHALLENGE_CHOICES[c].map(p => chip(c, p)).join('')}</div>`).join('')}
+    <div class="row-btns"><button class="link" data-act="cnote-all">Pick all</button><button class="link" data-act="cnote-none">Clear</button></div>
+    ${none ? '<p class="note">Nothing picked for these clefs yet, so the landmark notes come up for now.</p>' : ''}` : ''}
+  </section>`;
 }
 
 /* ---------- what's known ---------- */
@@ -1410,6 +1430,8 @@ function renderMap() {
   <p class="note">The notes on each staff, named. The blue note is Middle C. Tap any note to hear it.</p>
   <section><h2>Treble clef</h2><div class="map-scroll">${row('t', 'C4', 'G5')}</div></section>
   <section><h2>Bass clef</h2><div class="map-scroll">${row('b', 'F2', 'C4')}</div></section>
+  ${state.cClefs ? `<section><h2>Alto clef</h2><p class="note">The middle of the clef points at Middle C, on the middle line.</p><div class="map-scroll">${row('a', 'E3', 'A4')}</div></section>
+  <section><h2>Tenor clef</h2><p class="note">The middle of the clef points at Middle C, on the 4th line.</p><div class="map-scroll">${row('n', 'C3', 'F4')}</div></section>` : ''}
   <details class="more-notes"><summary>More notes: the ledger lines</summary>
     <section><h2>High treble notes</h2><div class="map-scroll">${row('t', 'A5', 'E6')}</div></section>
     <section><h2>Low treble notes</h2><div class="map-scroll">${row('t', 'F3', 'B3')}</div></section>
@@ -1688,7 +1710,10 @@ function renderParent() {
     <div class="row-btns"><span>Real piano nearby</span>${seg('realpiano', state.realPiano ? 1 : 0, [[1, 'On'], [0, 'Off']])}</div>
     <p class="note">On: "find this key" questions and songs are played on your own piano. The app plays the right note so ${esc(N())} can check by ear. Off: tap the keys on screen.</p>
     <div class="row-btns"><span>Speaking speed</span>${seg('speed', state.speed, [['normal', 'Normal'], ['slow', 'Slower']])}</div>
+    <div class="row-btns"><span>Alto and tenor clefs</span>${seg('cclefs', state.cClefs ? 1 : 0, [[1, 'Show'], [0, 'Hide']])}</div>
+    <p class="note">Show: the Note Map adds the alto and tenor clefs (the C clefs). They can also be switched on for the Challenge below.</p>
   </section>
+  ${renderChallengeSettings(seg)}
   <section>
     <h2>Coming back for review</h2>
     <p class="note">A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being right. ${state.cleared ? `${state.cleared} learned for good so far.` : ''}</p>
@@ -1837,6 +1862,13 @@ const ACTIONS = {
   per(d) { state.perSession = +d.n; save(); render(); },
   autospeak(d) { state.autoSpeak = d.v === '1'; save(); render(); },
   answerwith(d) { state.answerWith = d.v; save(); render(); },
+  cclef(d) { const on = challengeClefs(), next = on.includes(d.v) ? on.filter(c => c !== d.v) : [...on, d.v]; if (next.length) { state.challengeClefs = next; save(); } render(); },
+  cclefs(d) { state.cClefs = d.v === '1'; save(); render(); },
+  // switching to Choose starts from the notes Automatic would ask now, so nothing changes until a note is tapped
+  cmode(d) { state.challengeNotes = d.v === '1' ? autoChallengePool().map(([c, p]) => `${c}:${p}`) : null; save(); render(); },
+  cnote(d) { const set = new Set(state.challengeNotes || []); set.has(d.n) ? set.delete(d.n) : set.add(d.n); state.challengeNotes = [...set]; save(); render(); },
+  'cnote-all'() { const set = new Set(state.challengeNotes || []); for (const c of ['t', 'b', 'a', 'n']) if (challengeClefOk(c)) CHALLENGE_CHOICES[c].forEach(p => set.add(`${c}:${p}`)); state.challengeNotes = [...set]; save(); render(); },
+  'cnote-none'() { state.challengeNotes = (state.challengeNotes || []).filter(x => !challengeClefOk(x.split(':')[0])); save(); render(); },
   async 'mic-test'() {
     micTest = !micTest; micLog = [];
     if (micTest) await startMic(); else stopMic();
@@ -1849,7 +1881,7 @@ const ACTIONS = {
   'topic-reset-yes'(d) { resetTopic(d.k); confirmTopic = null; save(); render(); },
   wipe() { confirmWipe = true; render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },

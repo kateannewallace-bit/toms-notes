@@ -25,7 +25,11 @@ const prettySym = p => { const { letter, acc } = parseP(p); return letter + (acc
 const CLEF = {
   t: { name: 'treble', bottom: stepOf('E4'), cs: [['C6', 'the C on the second ledger line above the staff'], ['C5', 'the C in the third space'], ['C4', 'Middle C']] },
   b: { name: 'bass', bottom: stepOf('G2'), cs: [['C2', 'the C on the second ledger line below the staff'], ['C3', 'the C in the second space'], ['C4', 'Middle C']] },
+  // The two C clefs, for grown-ups to switch on: the clef's middle points at Middle C. Alto: the middle line. Tenor: the 4th line.
+  a: { name: 'alto', bottom: stepOf('F3'), cs: [['C5', 'the C just above the first ledger line above the staff'], ['C3', 'the C just below the first ledger line below the staff'], ['C4', 'Middle C, on the middle line']] },
+  n: { name: 'tenor', bottom: stepOf('D3'), cs: [['C5', 'the C on the first ledger line above the staff'], ['C3', 'the C just below the bottom line'], ['C4', 'Middle C, on the 4th line']] },
 };
+const CLEF_NAMES = { t: 'Treble clef', b: 'Bass clef', a: 'Alto clef', n: 'Tenor clef' };
 const topOf = c => CLEF[c].bottom + 8;
 const regionOf = (c, s) => s > topOf(c) ? 'above' : s < CLEF[c].bottom ? 'below' : 'on';
 const ledgersFor = (c, s) => s > topOf(c) ? Math.floor((s - topOf(c)) / 2) : s < CLEF[c].bottom ? Math.floor((CLEF[c].bottom - s) / 2) : 0;
@@ -46,7 +50,8 @@ function describe(c, s) {
 }
 // The C to start from, and the walk of letters from it to this note.
 function walkTo(c, s) {
-  const outward = ([p]) => c === 't' ? s >= stepOf(p) : s <= stepOf(p);
+  // treble walks up from Middle C and bass walks down; the C clefs sit around Middle C, so they walk either way
+  const outward = ([p]) => c === 't' ? s >= stepOf(p) : c === 'b' ? s <= stepOf(p) : p === 'C4' ? false : stepOf(p) > stepOf('C4') ? s >= stepOf(p) : s <= stepOf(p);
   const [p, words] = CLEF[c].cs.find(outward) || CLEF[c].cs[2];
   const mark = { s: stepOf(p), words }, dir = s >= mark.s ? 1 : -1, steps = [];
   for (let x = mark.s; ; x += dir) { steps.push(x); if (x === s) break; }
@@ -130,7 +135,8 @@ function staffSvg(o) {
   const timeW = o.time ? S * 2.4 : 0;
   let out = '';
   for (let i = 0; i < 5; i++) out += `<line class="st-line" x1="4" x2="${w - 4}" y1="${yTop + i * S}" y2="${yTop + i * S}"/>`;
-  if (!o.noClef) out += c === 't' ? glyph('treble', 8, Y(bottom), S, 'clef') : glyph('bass', 8, Y(bottom) - S * BASS_CLEF_RAISE, S, 'clef');
+  if (!o.noClef) out += c === 't' ? glyph('treble', 8, Y(bottom), S, 'clef') : c === 'b' ? glyph('bass', 8, Y(bottom) - S * BASS_CLEF_RAISE, S, 'clef')
+    : glyph('cclef', 8, Y(c === 'n' ? bottom + 2 : bottom), S, 'clef');  // the C clef's middle sits on Middle C's line
   if (o.time) out += `<text class="timesig" x="${clefW + S}" y="${yTop + S * 1.86}" font-size="${S * 2.3}">${o.time[0]}</text><text class="timesig" x="${clefW + S}" y="${yTop + S * 3.86}" font-size="${S * 2.3}">${o.time[1]}</text>`;
   const items = o.items || [], x0 = clefW + timeW + S * 1.2, room = w - x0 - S * 1.4;
   const weight = i => i.bar ? .35 : Math.max(.85, Math.sqrt(BEATS[i.d || i.r || i.gap || 'q'] || 1));

@@ -10,13 +10,37 @@ let game = null;
 
 // Notes Tom has learned, with their clefs: the landmarks always, plus notes met in Out from Middle C, within the keys shown.
 // Levels 1 and 2 ask only the landmarks. From level 3, each level adds two more learned notes, the ones closest to Middle C first.
+// A grown-up can instead pick the exact notes (state.challengeNotes), and limit it to one clef (state.challengeClefs).
+// The notes a grown-up can pick from: everything on the keys shown that reads easily on each clef.
+const CHALLENGE_CHOICES = {
+  t: ['A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'], b: ['C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4'],
+  a: ['E3', 'F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4'], n: ['C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4'],
+};
+// Which clefs the Challenge uses: treble and bass unless a grown-up changes it. Alto ('a') and tenor ('n') are there to switch on.
+const challengeClefs = () => Array.isArray(state.challengeClefs) && state.challengeClefs.length ? state.challengeClefs : ['t', 'b'];
+const challengeClefOk = c => challengeClefs().includes(c);
+const LANDMARKS = [['t', 'C4'], ['b', 'C4'], ['t', 'G4'], ['b', 'F3'], ['a', 'C4'], ['n', 'C4']];
 function challengePool() {
+  const fallback = LANDMARKS.filter(([c]) => challengeClefOk(c));
+  if (state.challengeNotes) {
+    const picked = state.challengeNotes.map(x => x.split(':')).filter(([c]) => challengeClefOk(c));
+    return picked.length ? picked : fallback;
+  }
+  return autoChallengePool().filter(([c]) => challengeClefOk(c));
+}
+// The C clefs aren't in the lessons, so on Automatic they start at Middle C and add the notes either side, one step out per level from level 3.
+function cClefNotes(c) {
+  const out = [[c, 'C4']];
+  for (let i = 1; i <= Math.max(0, challengeLevel() - 2); i++) out.push([c, pitchOf(stepOf('C4') + i)], [c, pitchOf(stepOf('C4') - i)]);
+  return out.filter(([, p]) => CHALLENGE_CHOICES[c].includes(p));
+}
+function autoChallengePool() {
   const lo = midiOf(CHALLENGE_FROM), hi = whiteMidi(stepOf(CHALLENGE_FROM) + CHALLENGE_WHITES - 1);
   const pool = [['t', 'C4'], ['b', 'C4'], ['t', 'G4'], ['b', 'F3']];
   const learned = allItems('path').filter(it => it.note && isSeen(it.wid) && midiOf(it.p) >= lo && midiOf(it.p) <= hi && !pool.some(([c, p]) => c === it.clef && p === it.p))
     .sort((a, b) => Math.abs(stepOf(a.p) - stepOf('C4')) - Math.abs(stepOf(b.p) - stepOf('C4')));
   for (const it of learned.slice(0, Math.max(0, challengeLevel() - 2) * 2)) pool.push([it.clef, it.p]);
-  return pool;
+  return pool.concat(cClefNotes('a'), cClefNotes('n'));
 }
 function startChallenge() {
   audioReady();
