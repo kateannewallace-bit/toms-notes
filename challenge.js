@@ -2,8 +2,9 @@
    Play that note on the keys before he runs off. Ten right wins; three misses loses. A grown-up setting picks the endings (state.loseEnding):
    'sulk', the standard ones: winning, he cheers and a golden laurel wreath lands on his head. Losing, he sits on a fallen
      column in the crumbling labyrinth under a rain cloud, "Harrumph!", a sigh.
-   'theseus': winning, the laurel wreath and then the Hydra comes to party in five party hats. Losing, Theseus runs into the
-     labyrinth and slays him with a sword. Cartoonish: he topples over with X eyes, no blood.
+   'theseus': winning, the laurel wreath; Theseus is hiding in a bush, and the Hydra comes in five party hats, spots him and
+     gobbles him up while the Note Beast cheers; then the party. Losing, Theseus runs into the
+     labyrinth and slays him with a sword: he topples over with his eyes shut, the sword sticking out of him and cartoon blood (Tom's asks).
    (Tom asked for Theseus and the Hydra on 2026-11-07; before that he hadn't liked the Beast collapsing on its own.)
    A wrong key, or letting him run off, costs a pair of horns and sends him round for another lap with the same note. */
 
@@ -71,7 +72,7 @@ const challengeLevel = () => (state.challenge?.wins || 0) + 1;
 const lapSpeed = () => Math.max(.45, 1 - (challengeLevel() - 1) * .056);
 function challengeFrame(now) {
   if (!game || screen !== 'challenge') return;
-  const ms = PHASE_MS[game.phase] * (['in', 'wait', 'out'].includes(game.phase) ? lapSpeed() : 1), t = Math.min(1, (now - game.t0) / ms);
+  const ms = (game.phase === 'celebrate' && state.loseEnding === 'theseus' ? 8200 : PHASE_MS[game.phase]) * (['in', 'wait', 'out'].includes(game.phase) ? lapSpeed() : 1), t = Math.min(1, (now - game.t0) / ms);
   const ease = v => v * (2 - v);
   if (game.phase === 'in') game.x = -.4 + .9 * ease(t);
   else if (game.phase === 'out' || game.phase === 'flee') game.x = game.from + (1.4 - game.from) * t * t;
@@ -114,6 +115,9 @@ function challengeFrame(now) {
       setTimeout(() => {
         if (game?.phase !== 'strike') return;
         game.mood = 'defeated'; game.pose = 'cheer'; game.fell = true; drawBeast();
+        // the sword stays in the Note Beast; blood pools on the floor
+        document.getElementById('hero')?.classList.add('unarmed');
+        setTimeout(() => document.getElementById('blood')?.classList.add('show'), 700);
         if (!hearing()) grunt('sad');
       }, 380);
     } else if (game.phase === 'strike') {
@@ -147,7 +151,7 @@ function drawBeast() {
   if (!el) return;
   const [clef, p] = game.target;
   const placard = ['sit', 'cheer'].includes(game.pose) ? '' : staffSvg({ clef, S: 12, width: 168, tight: true, items: [{ p, d: 'w' }], noteX: 118 });
-  el.innerHTML = beastFigure(game.mood, game.pose, placard, { laurel: game.laurel });
+  el.innerHTML = beastFigure(game.mood, game.pose, placard, { laurel: game.laurel, stabbed: game.fell });
   placeBeast(0);
 }
 function hornsHtml() {
@@ -183,13 +187,22 @@ function challengeKey(midi) {
     showCaughtName();
     if (game.caught >= CHALLENGE_GOAL) {
       // the last one: he stays in the middle, cheers, and a champion's laurel wreath lands on his head
-      game.over = 'won'; game.mood = 'happy'; game.pose = 'cheer'; game.laurel = true; game.x = state.loseEnding === 'theseus' ? .4 : .5;
+      const toms = state.loseEnding === 'theseus';
+      game.over = 'won'; game.mood = 'happy'; game.pose = 'cheer'; game.laurel = true; game.x = toms ? .27 : .5;
       setPhase('celebrate');
       confetti();
       beastSays('Hooray! You did it!');
-      // then, with Tom's endings, the Hydra arrives for the party
-      if (state.loseEnding === 'theseus') setTimeout(() => { if (game?.phase !== 'celebrate') return; document.getElementById('party')?.classList.add('in'); balloons(); }, 1200);
-      if (state.loseEnding === 'theseus') setTimeout(() => { if (game?.phase === 'celebrate') beastSays('Party time!'); }, 2600);
+      // Tom's ending: Theseus is hiding in a bush. The Hydra arrives in party hats, spots him, and gobbles him up,
+      // while the Note Beast cheers. Then the party.
+      if (toms) {
+        const el = id => document.getElementById(id), still = () => game?.phase === 'celebrate';
+        el('bush')?.classList.add('show');
+        setTimeout(() => { if (still()) el('party')?.classList.add('in'); }, 1000);
+        setTimeout(() => { if (!still()) return; el('party')?.classList.add('spot'); el('bush')?.classList.add('scared'); beastSays('Look! Theseus!'); }, 2500);
+        setTimeout(() => { if (still()) el('party')?.classList.add('chomp'); }, 3500);
+        setTimeout(() => { if (!still()) return; el('bush')?.classList.add('eaten'); if (!hearing()) gulp(); }, 4050);
+        setTimeout(() => { if (!still()) return; beastSays('Yum! Party time!'); balloons(); }, 5000);
+      }
       if (!hearing()) setTimeout(() => playSeq([{ midi: 60, beats: .3 }, { midi: 64, beats: .3 }, { midi: 67, beats: .3 }, { midi: 72, beats: 1.2 }], 110), 900);
       grunt('happy', hearing() ? 0 : 2.3);
       return;
@@ -255,9 +268,9 @@ function renderChallenge() {
   const keys = pianoSvg({ from: stepOf(CHALLENGE_FROM), whites: CHALLENGE_WHITES, letters: 'c' });
   const panel = !game.finished ? '' : game.over === 'won'
     ? `<div class="game-over won"><div class="beast won party-pair">${beastSvg('happy', { laurel: true })}${state.loseEnding === 'theseus' ? hydraSvg() : ''}</div><h1>You beat the Note Beast Challenge!</h1><p class="beast-says">${esc(pick(BEAST_SAYS.doneHappy))}</p><div class="row-btns"><button class="start" data-act="challenge">Play again</button><button class="ghost" data-act="home">Home</button></div></div>`
-    : `<div class="game-over lost">${state.loseEnding === 'theseus' ? `<div class="beast hero-pair">${theseusSvg()}${beastSvg('defeated')}</div>` : `<div class="beast">${beastSvg('sad')}</div>`}<h1>TRY AGAIN</h1><p class="meta">You caught ${game.caught} of ${CHALLENGE_GOAL}.</p><div class="row-btns"><button class="start" data-act="challenge">Try again</button><button class="ghost" data-act="home">Home</button></div></div>`;
+    : `<div class="game-over lost">${state.loseEnding === 'theseus' ? `<div class="beast hero-pair unarmed">${theseusSvg()}${beastSvg('defeated')}</div>` : `<div class="beast">${beastSvg('sad')}</div>`}<h1>TRY AGAIN</h1><p class="meta">You caught ${game.caught} of ${CHALLENGE_GOAL}.</p><div class="row-btns"><button class="start" data-act="challenge">Try again</button><button class="ghost" data-act="home">Home</button></div></div>`;
   return `<header class="top game-top"><span class="caught-label">Level ${challengeLevel()} · Caught <strong id="caught">${game.caught} of ${CHALLENGE_GOAL}</strong></span><span id="lives" class="lives" role="img" aria-label="${game.lives} of ${CHALLENGE_LIVES} lives left">${hornsHtml()}</span></header>
-  <div class="stage" id="stage"><div class="runner" id="runner"></div><div class="caught-name" id="caught-name" aria-live="polite"></div><p class="beast-says game-says" id="beast-says"></p><div class="ruins" id="ruins" aria-hidden="true">${MAZE_RUINS}</div><div class="rain-cloud" id="cloud" aria-hidden="true"><svg viewBox="0 0 120 70"><path d="M24 50 Q8 50 10 36 Q12 24 26 26 Q30 10 48 12 Q62 2 76 14 Q94 10 98 28 Q114 30 110 44 Q108 52 96 50 Z" fill="#c9ced4" stroke="#7d8790" stroke-width="3"/></svg><span></span><span></span><span></span><span></span><span></span></div><div class="hero" id="hero" aria-hidden="true">${theseusSvg()}</div><div class="party" id="party" aria-hidden="true">${hydraSvg()}</div><div class="balloons" id="balloons" aria-hidden="true"></div><div class="confetti" id="confetti" aria-hidden="true"></div>${panel}</div>
+  <div class="stage" id="stage"><div class="runner" id="runner"></div><div class="caught-name" id="caught-name" aria-live="polite"></div><p class="beast-says game-says" id="beast-says"></p><div class="ruins" id="ruins" aria-hidden="true">${MAZE_RUINS}</div><div class="rain-cloud" id="cloud" aria-hidden="true"><svg viewBox="0 0 120 70"><path d="M24 50 Q8 50 10 36 Q12 24 26 26 Q30 10 48 12 Q62 2 76 14 Q94 10 98 28 Q114 30 110 44 Q108 52 96 50 Z" fill="#c9ced4" stroke="#7d8790" stroke-width="3"/></svg><span></span><span></span><span></span><span></span><span></span></div><div class="blood-pool" id="blood" aria-hidden="true"></div><div class="hero" id="hero" aria-hidden="true">${theseusSvg()}</div><div class="bush" id="bush" aria-hidden="true">${bushSvg()}</div><div class="party" id="party" aria-hidden="true"><span class="spotted">!</span>${hydraSvg()}</div><div class="balloons" id="balloons" aria-hidden="true"></div><div class="confetti" id="confetti" aria-hidden="true"></div>${panel}</div>
   <div class="game-keys ${hearing() ? 'listening' : ''}">${hearing() ? listenPanel('Listening. Play the note on your piano.') : keys}</div>
   <button class="link" data-act="home" style="align-self:flex-start">Stop and go home</button>`;
 }

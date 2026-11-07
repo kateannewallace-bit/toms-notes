@@ -360,6 +360,18 @@ function slash(when = 0) {
   liveNodes.push(src, os);
   soundingUntil = Math.max(soundingUntil, performance.now() + (when + 1.7) * 1000);
 }
+// The Hydra's gulp: two quick, low, swallowing blips, then a little burp of a bellow.
+function gulp(when = 0) {
+  const a = audioReady();
+  if (!a) return;
+  [0, .22].forEach((dt, i) => {
+    const t = a.currentTime + when + .02 + dt, os = a.createOscillator(), g = a.createGain();
+    os.type = 'sine'; os.frequency.setValueAtTime(i ? 260 : 340, t); os.frequency.exponentialRampToValueAtTime(70, t + .18);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.7, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + .2);
+    os.connect(g); g.connect(masterGain); os.start(t); os.stop(t + .22); liveNodes.push(os);
+  });
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + .7) * 1000);
+}
 // A big, sulky sigh: a breath in, then a long breath out that sinks, with a low grumble under it.
 function sigh(when = 0) {
   const a = audioReady();

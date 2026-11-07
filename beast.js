@@ -14,7 +14,9 @@ function beastHead(mood) {
   }[mood];
   const eyes = mood === 'happy'
     ? `<circle cx="80" cy="100" r="12" fill="#fff"/><circle cx="120" cy="100" r="12" fill="#fff"/><circle cx="81" cy="101" r="6" fill="${ink}"/><circle cx="119" cy="101" r="6" fill="${ink}"/><circle cx="83" cy="98" r="2.2" fill="#fff" stroke="none"/><circle cx="121" cy="98" r="2.2" fill="#fff" stroke="none"/>`
-    : mood === 'dizzy' || mood === 'defeated'
+    : mood === 'defeated'
+    ? `<path d="M68 100 Q80 110 92 100" fill="none" stroke-width="4"/><path d="M108 100 Q120 110 132 100" fill="none" stroke-width="4"/><path d="M70 104 L66 110 M80 108 L80 114 M90 104 L94 110 M110 104 L106 110 M120 108 L120 114 M130 104 L134 110" stroke-width="2.5"/>`
+    : mood === 'dizzy'
     ? '<path d="M72 92 L88 108 M88 92 L72 108 M112 92 L128 108 M128 92 L112 108" fill="none" stroke-width="4"/>'
     : mood === 'sad'
     ? `<circle cx="80" cy="102" r="11" fill="#fff"/><circle cx="120" cy="102" r="11" fill="#fff"/><circle cx="80" cy="106" r="5" fill="${ink}"/><circle cx="120" cy="106" r="5" fill="${ink}"/><path d="M69 99 Q80 90 91 99 Z M109 99 Q120 90 131 99 Z" fill="${fur}" stroke-width="2.5"/>`
@@ -64,6 +66,19 @@ function beastHead(mood) {
 const beastLaurel = () => `<g class="laurel" fill="#f3c94a" stroke="${BEAST_INK}" stroke-width="2"><path d="M58 76 Q60 40 100 40 Q140 40 142 76" fill="none" stroke="#b8902a" stroke-width="3"/><ellipse cx="56.8" cy="68.3" rx="9" ry="4.2" transform="rotate(-102 56.8 68.3) translate(-5 0)"/><ellipse cx="56.8" cy="68.3" rx="9" ry="4.2" transform="rotate(-32 56.8 68.3) translate(5 0)"/><ellipse cx="54.5" cy="76.2" rx="9" ry="4.2" transform="rotate(-115 54.5 76.2) translate(-5 0)"/><ellipse cx="54.5" cy="76.2" rx="9" ry="4.2" transform="rotate(-45 54.5 76.2) translate(5 0)"/><ellipse cx="54.1" cy="79.7" rx="9" ry="4.2" transform="rotate(59 54.1 79.7) translate(-5 0)"/><ellipse cx="54.1" cy="79.7" rx="9" ry="4.2" transform="rotate(129 54.1 79.7) translate(5 0)"/><ellipse cx="55.6" cy="71.6" rx="9" ry="4.2" transform="rotate(72 55.6 71.6) translate(-5 0)"/><ellipse cx="55.6" cy="71.6" rx="9" ry="4.2" transform="rotate(142 55.6 71.6) translate(5 0)"/><ellipse cx="58.9" cy="64.0" rx="9" ry="4.2" transform="rotate(85 58.9 64.0) translate(-5 0)"/><ellipse cx="58.9" cy="64.0" rx="9" ry="4.2" transform="rotate(155 58.9 64.0) translate(5 0)"/><ellipse cx="63.9" cy="57.2" rx="9" ry="4.2" transform="rotate(97 63.9 57.2) translate(-5 0)"/><ellipse cx="63.9" cy="57.2" rx="9" ry="4.2" transform="rotate(167 63.9 57.2) translate(5 0)"/><ellipse cx="70.4" cy="51.4" rx="9" ry="4.2" transform="rotate(109 70.4 51.4) translate(-5 0)"/><ellipse cx="70.4" cy="51.4" rx="9" ry="4.2" transform="rotate(179 70.4 51.4) translate(5 0)"/><ellipse cx="143.2" cy="68.3" rx="9" ry="4.2" transform="rotate(32 143.2 68.3) translate(-5 0)"/><ellipse cx="143.2" cy="68.3" rx="9" ry="4.2" transform="rotate(102 143.2 68.3) translate(5 0)"/><ellipse cx="145.5" cy="76.2" rx="9" ry="4.2" transform="rotate(45 145.5 76.2) translate(-5 0)"/><ellipse cx="145.5" cy="76.2" rx="9" ry="4.2" transform="rotate(115 145.5 76.2) translate(5 0)"/><ellipse cx="145.9" cy="79.7" rx="9" ry="4.2" transform="rotate(-129 145.9 79.7) translate(-5 0)"/><ellipse cx="145.9" cy="79.7" rx="9" ry="4.2" transform="rotate(-59 145.9 79.7) translate(5 0)"/><ellipse cx="144.4" cy="71.6" rx="9" ry="4.2" transform="rotate(-142 144.4 71.6) translate(-5 0)"/><ellipse cx="144.4" cy="71.6" rx="9" ry="4.2" transform="rotate(-72 144.4 71.6) translate(5 0)"/><ellipse cx="141.1" cy="64.0" rx="9" ry="4.2" transform="rotate(-155 141.1 64.0) translate(-5 0)"/><ellipse cx="141.1" cy="64.0" rx="9" ry="4.2" transform="rotate(-85 141.1 64.0) translate(5 0)"/><ellipse cx="136.1" cy="57.2" rx="9" ry="4.2" transform="rotate(-167 136.1 57.2) translate(-5 0)"/><ellipse cx="136.1" cy="57.2" rx="9" ry="4.2" transform="rotate(-97 136.1 57.2) translate(5 0)"/><ellipse cx="129.6" cy="51.4" rx="9" ry="4.2" transform="rotate(-179 129.6 51.4) translate(-5 0)"/><ellipse cx="129.6" cy="51.4" rx="9" ry="4.2" transform="rotate(-109 129.6 51.4) translate(5 0)"/><circle cx="100" cy="40" r="4.5" fill="#d9534f"/></g>`;
 // A long, broken old column lying on its side, for him to sit on when he sulks (he lives in a labyrinth, after all).
 const beastColumn = () => `<g stroke="${BEAST_INK}" stroke-width="3.5" stroke-linejoin="round"><path d="M-30 336 L246 336 L238 350 L252 362 L240 376 L254 388 L246 400 L-30 400 Z" fill="#ece4d4"/><path d="M-30 349 H244 M-30 362 H248 M-30 375 H246 M-30 388 H250" stroke="#b7ab95" stroke-width="3"/><ellipse cx="-30" cy="368" rx="16" ry="32" fill="#f6f0e4"/><ellipse cx="-30" cy="368" rx="9" ry="20" fill="none" stroke="#b7ab95" stroke-width="2.5"/></g>`;
+// Theseus's sword left in the fallen Note Beast, with cartoon blood. Drawn in his own (standing) coordinates: once he
+// has toppled over, the sword points up out of him and the drips run down toward the floor.
+const beastStabbed = () => `<g stroke="${BEAST_INK}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M136 232 C150 236 168 238 186 236 C196 244 192 252 182 250 C170 252 154 250 140 246 Z" fill="#c4161c"/>
+  <path d="M160 240 Q174 246 172 256 Q168 262 164 254 Z M178 238 Q196 242 194 254 Q188 260 186 250 Z" fill="#c4161c"/>
+  <path d="M130 236 L120 226 L132 228 L128 216 L138 226 L146 218 L144 232 L156 232 L144 240 L150 250 L138 244 L132 254 L132 242 L120 246 Z" fill="#d7262c"/>
+  <path d="M138 232 L-6 202 L-9 218 L134 248 Z" fill="#e8eef1" stroke-width="3.5"/>
+  <path d="M128 239 L4 212" stroke="#9aa6ad" stroke-width="3"/>
+  <path d="M110 236 L64 226 M96 240 L80 236" stroke="#c4161c" stroke-width="6"/>
+  <path d="M-2 186 L-14 240" stroke="${BEAST_INK}" stroke-width="15"/><path d="M-2 186 L-14 240" stroke="#a87b22" stroke-width="9"/>
+  <path d="M-8 211 L-52 202" stroke="${BEAST_INK}" stroke-width="17"/><path d="M-8 211 L-52 202" stroke="#7a4a24" stroke-width="10"/>
+  <circle cx="-56" cy="201" r="10" fill="#d4a640" stroke-width="3.5"/>
+</g>`;
 // Head and shoulders, beside the answers.
 function beastSvg(mood, opts = {}) {
   return `<svg class="beast-art" viewBox="0 0 200 210" role="img" aria-label="The Note Beast ${mood === 'happy' ? 'looks delighted' : 'looks concerned'}${opts.laurel ? ', wearing a golden laurel wreath' : ''}">
@@ -73,7 +88,7 @@ function beastSvg(mood, opts = {}) {
 }
 // The whole Note Beast, for the Challenge: a broad, shaggy minotaur holding the placard in front of his chest.
 // pose: 'hold' (both hands on the placard), 'thumbs' (one thumb up), 'cheer' (both arms up), 'sit' (sitting down, sulking).
-// opts.laurel puts a golden laurel wreath on his head. Sitting, he sits on a broken column.
+// opts.laurel puts a golden laurel wreath on his head. opts.stabbed: Theseus's sword stuck in his chest, with cartoon blood. Sitting, he sits on a broken column.
 // placard: the staff to show on it, as an <svg> string.
 function beastFigure(mood, pose, placard = '', opts = {}) {
   const ink = BEAST_INK, fur = BEAST_FUR, dark = BEAST_DARK, tan = BEAST_TAN;
@@ -108,38 +123,62 @@ function beastFigure(mood, pose, placard = '', opts = {}) {
   </g>
   ${arms}
   <g transform="translate(20 0)">${beastHead(mood)}${opts.laurel ? beastLaurel() : ''}</g>
-  ${front}
+  ${front}${opts.stabbed ? beastStabbed() : ''}
 </svg>`;
 }
 
 /* Theseus, the hero from the old story, who comes into the labyrinth when the Challenge is lost (if a grown-up picks that ending).
-   Tom asked for this: Theseus slays the Note Beast with a sword. It stays cartoonish: a swing, a clang, X eyes, no blood.
-   He faces right, toward the Note Beast. The sword arm swings on CSS (.sword-arm), pivoting at the shoulder. */
+   Tom asked for this: Theseus slays the Note Beast with a sword (a long, sharp one, Tom says), and leaves it sticking out
+   of him with cartoon blood dripping out. Only with the grown-ups' "Theseus and the Hydra" endings setting.
+   He stands facing out, toward Tom. The sword arm swings on CSS (.sword-arm), pivoting at the shoulder. */
 function theseusSvg() {
-  const ink = BEAST_INK, skin = '#f0c9a0', bronze = '#d4a640', red = '#c0392b';
-  return `<svg class="theseus" viewBox="0 0 220 380" role="img" aria-label="Theseus, the hero, with a sword and shield">
+  const ink = BEAST_INK, skin = '#e8b98c', bronze = '#d4a640', bronzeDk = '#a87b22', red = '#b8322a', redDk = '#8a2019', leather = '#8a5a2b';
+  // limbs drawn like the Note Beast's: a dark outline stroke with a fill stroke on top
+  const limb = (d, w, fill) => `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${w + 7}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${fill}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const leg = x => `${limb(`M${x} 262 L${x} 370`, 26, skin)}<path d="M${x - 15} 316 Q${x} 310 ${x + 15} 316 L${x + 14} 366 L${x - 14} 366 Z" fill="${bronze}" stroke="${ink}" stroke-width="3"/><rect x="${x - 18}" y="368" width="38" height="14" rx="6" fill="${leather}" stroke="${ink}" stroke-width="3"/>`;
+  return `<svg class="theseus" viewBox="0 0 260 392" role="img" aria-label="Theseus, the hero, with sword and shield">
   <g stroke="${ink}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
-    <g class="t-legs">
-      <rect x="78" y="262" width="22" height="92" rx="9" fill="${skin}"/><rect x="118" y="262" width="22" height="92" rx="9" fill="${skin}"/>
-      <path d="M78 330 H100 M78 342 H100 M118 330 H140 M118 342 H140" stroke="#7a4a24" stroke-width="4"/>
-      <rect x="74" y="350" width="32" height="12" rx="5" fill="#7a4a24"/><rect x="114" y="350" width="32" height="12" rx="5" fill="#7a4a24"/>
-    </g>
-    <path d="M70 150 L150 150 L162 272 L58 272 Z" fill="#fbf8f0"/>
-    <path d="M58 272 L162 272 L160 260 L60 260 Z" fill="${red}"/>
-    <rect x="66" y="196" width="88" height="10" fill="#7a4a24"/>
-    <path d="M150 150 L176 158" stroke="${skin}" stroke-width="0"/>
-    <circle cx="110" cy="104" r="34" fill="${skin}"/>
-    <circle cx="122" cy="102" r="4" fill="${ink}" stroke="none"/>
-    <path d="M114 92 L130 96" stroke-width="4"/>
-    <path d="M114 120 Q124 126 134 118" fill="none"/>
-    <path d="M74 104 C70 60 150 56 146 100 L146 110 L132 106 L130 84 L92 84 L90 116 L76 120 Z" fill="${bronze}"/>
-    <path d="M78 66 C86 22 138 18 150 60 C138 44 96 42 78 66 Z" fill="${red}"/>
-    <path d="M86 52 L92 40 M100 44 L104 30 M116 42 L118 28 M132 46 L138 34" stroke="#8e2219" stroke-width="3"/>
+    <path d="M78 150 C52 210 44 290 60 352 L112 340 L118 160 Z" fill="${red}"/>
+    <path d="M70 230 C64 270 64 310 70 344" fill="none" stroke="${redDk}" stroke-width="3"/>
+    ${leg(112)}${leg(156)}
+    <path d="M86 238 L182 238 L190 286 L78 286 Z" fill="${red}"/>
+    <path d="M84 238 L184 238 L188 278 L80 278 Z" fill="${leather}"/>
+    <path d="M98 240 V278 M112 240 V278 M126 240 V278 M140 240 V278 M154 240 V278 M168 240 V278" stroke="${ink}" stroke-width="2.5"/>
+    <path d="M84 156 C84 146 104 140 134 140 C164 140 184 146 184 156 L180 222 C178 236 160 244 134 244 C108 244 90 236 88 222 Z" fill="${bronze}"/>
+    <path d="M106 176 Q120 188 134 178 Q148 188 162 176" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
+    <path d="M134 182 V230 M112 206 Q134 214 156 206" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
+    <rect x="96" y="226" width="76" height="12" rx="3" fill="${leather}"/>
+    <rect x="122" y="118" width="24" height="26" fill="${skin}"/>
+    <path d="M134 16 C150 14 164 24 170 40" fill="none"/>
+    <path d="M96 58 C96 22 172 22 172 58 L172 110 C172 118 166 122 158 120 L152 92 L146 92 L146 124 L122 124 L122 92 L116 92 L110 120 C102 122 96 118 96 110 Z" fill="${bronze}"/>
+    <path d="M122 92 L146 92 L146 124 L122 124 Z" fill="${skin}"/>
+    <path d="M110 74 L158 74 L158 92 L110 92 Z" fill="${ink}"/>
+    <circle cx="122" cy="83" r="5" fill="#fff" stroke="none"/><circle cx="146" cy="83" r="5" fill="#fff" stroke="none"/>
+    <circle cx="123" cy="84" r="2.6" fill="${ink}" stroke="none"/><circle cx="147" cy="84" r="2.6" fill="${ink}" stroke="none"/>
+    <path d="M130 74 L138 74 L137 104 L131 104 Z" fill="${bronze}" stroke-width="2.5"/>
+    <path d="M126 114 Q134 119 142 114" fill="none" stroke-width="3"/>
+    <path d="M100 64 Q134 52 168 64" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
+    <path d="M128 36 C110 -8 162 -10 176 16 C186 34 184 52 176 62 C172 40 160 28 140 30 Z" fill="${red}"/>
+    <path d="M136 30 C138 12 152 4 166 10 M146 30 C150 18 162 14 172 22 M154 32 C160 26 170 26 176 36" fill="none" stroke="${redDk}" stroke-width="3"/>
+    <rect x="124" y="30" width="20" height="10" rx="2" fill="${bronzeDk}"/>
   </g>
-  <g class="shield" stroke="${ink}" stroke-width="3.5"><circle cx="78" cy="196" r="46" fill="${bronze}"/><circle cx="78" cy="196" r="34" fill="none" stroke="#a87f22" stroke-width="3"/><path d="M62 216 L78 174 L94 216" fill="none" stroke="${red}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></g>
   <g class="sword-arm">
-    <path d="M146 158 L146 214" stroke="${ink}" stroke-width="25" stroke-linecap="round"/><path d="M146 158 L146 214" stroke="${skin}" stroke-width="18" stroke-linecap="round"/>
-    <g stroke="${ink}" stroke-width="3" stroke-linejoin="round"><rect x="132" y="216" width="28" height="9" rx="3" fill="${bronze}"/><path d="M140 225 L152 225 L150 300 L146 312 L142 300 Z" fill="#dfe6ea"/><circle cx="146" cy="214" r="10" fill="${skin}"/></g>
+    ${limb('M178 166 L196 210 L198 248', 24, skin)}
+    <g class="blade" stroke="${ink}" stroke-width="3" stroke-linejoin="round">
+      <path d="M192 262 L206 262 L209 300 L212 360 L199 440 L186 360 L189 300 Z" fill="#e8eef1"/>
+      <path d="M199 268 L199 420" stroke="#9aa6ad" stroke-width="2.5"/>
+      <path d="M204 290 L206 356 L200 412" fill="none" stroke="#fff" stroke-width="2.5"/>
+      <rect x="180" y="254" width="38" height="10" rx="4" fill="${bronzeDk}"/>
+    </g>
+    <circle cx="198" cy="246" r="13" fill="${skin}" stroke="${ink}" stroke-width="3"/>
+  </g>
+  <g class="shield" stroke="${ink}" stroke-width="3.5">
+    ${limb('M90 166 L74 206', 24, skin)}
+    <circle cx="70" cy="222" r="62" fill="${bronze}"/>
+    <circle cx="70" cy="222" r="50" fill="${red}" stroke-width="3"/>
+    <circle cx="70" cy="222" r="38" fill="${bronze}" stroke-width="3"/>
+    ${Array.from({ length: 12 }, (_, i) => { const t = i * Math.PI / 6; return `<circle cx="${(70 + 56 * Math.cos(t)).toFixed(1)}" cy="${(222 + 56 * Math.sin(t)).toFixed(1)}" r="2.6" fill="${bronzeDk}" stroke="none"/>`; }).join('')}
+    <path d="M70 196 L76 214 L95 214 L80 225 L86 244 L70 233 L54 244 L60 225 L45 214 L64 214 Z" fill="${red}" stroke-width="2.5"/>
   </g>
 </svg>`;
 }
@@ -170,3 +209,24 @@ function hydraSvg(o = {}) {
   ${heads.map(head).join('')}
 </svg>`;
 }
+
+// Theseus hiding in a bush: just his helmet, crest and eyes peek out. When the Hydra eats him (.eaten) the bush is left empty.
+function bushSvg() {
+  const ink = BEAST_INK, g1 = '#4f8f3f', g2 = '#6aab52', bronze = '#d4a640', red = '#b8322a';
+  return `<svg class="bush-art" viewBox="0 -44 220 214" role="img" aria-label="Theseus hiding in a bush">
+  <g class="peeker" stroke="${ink}" stroke-width="3.5" stroke-linejoin="round"><g transform="translate(0 -40)">
+    <path d="M100 36 C90 0 142 -2 150 26 C154 40 150 52 144 58 C142 40 132 32 116 34 Z" fill="${red}"/>
+    <path d="M84 84 C84 46 148 46 148 84 L148 110 L84 110 Z" fill="${bronze}"/>
+    <path d="M96 74 L136 74 L136 90 L96 90 Z" fill="${ink}"/>
+    <circle class="eye" cx="106" cy="82" r="5" fill="#fff" stroke="none"/><circle class="eye" cx="126" cy="82" r="5" fill="#fff" stroke="none"/>
+    <circle cx="107" cy="83" r="2.6" fill="${ink}" stroke="none"/><circle cx="127" cy="83" r="2.6" fill="${ink}" stroke="none"/>
+  </g></g>
+  <g stroke="${ink}" stroke-width="3.5">
+    <circle cx="52" cy="122" r="44" fill="${g1}"/><circle cx="168" cy="122" r="44" fill="${g1}"/>
+    <circle cx="110" cy="112" r="50" fill="${g2}"/><circle cx="80" cy="140" r="34" fill="${g2}"/><circle cx="142" cy="140" r="34" fill="${g2}"/>
+    <path d="M10 166 H210" stroke-width="3.5"/>
+  </g>
+  <g fill="none" stroke="#3f7a32" stroke-width="3" stroke-linecap="round"><path d="M92 98 q8 -8 16 0 M130 120 q8 -8 16 0 M50 118 q8 -8 16 0 M150 98 q8 -8 16 0"/></g>
+</svg>`;
+}
+

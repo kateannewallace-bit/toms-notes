@@ -444,14 +444,14 @@ body.game-mode .board > * { flex: none; }
 .cnote[aria-pressed="false"] { opacity: .45; }
 .cnote[aria-pressed="true"] { border-color: #111; box-shadow: 0 0 0 2px #111 inset; }
 /* losing: Theseus runs in, swings, and the Note Beast topples over, dizzy */
-.hero { position: absolute; bottom: 0; left: -30%; height: 76%; transform: translateX(-50%); z-index: 2; pointer-events: none; transition: left 1.3s cubic-bezier(.3, .7, .4, 1); }
+.hero { position: absolute; bottom: 0; left: -30%; height: 84%; transform: translateX(-50%); z-index: 2; pointer-events: none; transition: left 1.3s cubic-bezier(.3, .7, .4, 1); }
 .hero svg { display: block; height: 100%; width: auto; }
 .hero.in { left: 24%; }
 .hero.in:not(.swing) .theseus { animation: bob .28s ease-in-out infinite alternate; }
-.sword-arm { transform-box: view-box; transform-origin: 146px 158px; transform: rotate(-70deg); }
+.sword-arm { transform-box: view-box; transform-origin: 178px 166px; transform: rotate(-70deg); }
 .hero.swing .sword-arm { animation: swing .8s ease-in-out forwards; }
-@keyframes swing { 0% { transform: rotate(-70deg); } 45% { transform: rotate(160deg); } 62% { transform: rotate(-80deg); } 100% { transform: rotate(-60deg); } }
-.hero.victory .sword-arm { animation: none; transform: rotate(180deg); transition: transform .35s ease-out; }
+@keyframes swing { 0% { transform: rotate(-70deg); } 45% { transform: rotate(-200deg); } 62% { transform: rotate(-40deg); } 100% { transform: rotate(-60deg); } }
+.hero.victory .sword-arm { animation: none; transform: rotate(-140deg); transition: transform .35s ease-out; }
 .hero.victory .theseus { animation: hero-hop .4s ease-in-out 3 alternate; }
 @keyframes hero-hop { from { transform: translateY(0); } to { transform: translateY(-6%); } }
 .runner.felled .beast-figure { transform-origin: 50% 97%; transform: translateY(-9%) rotate(80deg) scale(.8); transition: transform .9s cubic-bezier(.55, 0, .9, .5); }
@@ -469,6 +469,28 @@ body.game-mode .board > * { flex: none; }
 .game-over .party-pair:has(.hydra), .game-over .hero-pair { width: auto; flex-direction: row; align-items: flex-end; justify-content: center; gap: 18px; }
 .party-pair .beast-art, .hero-pair .beast-art { width: clamp(110px, 16vw, 150px); }
 .party-pair svg.hydra, .hero-pair svg.theseus { height: clamp(130px, 18vw, 170px); width: auto; }
-.hero-pair .theseus .sword-arm { transform: rotate(180deg); }
+.hero-pair .theseus .sword-arm { transform: rotate(-140deg); }
+.theseus { overflow: visible; }
 @media (prefers-reduced-motion: reduce) { .hero.in:not(.swing) .theseus, .hero.victory .theseus, .hh, .balloons i { animation: none; } }
+/* the sword left in the Note Beast, and a cartoon puddle of blood under him */
+.hero.unarmed .blade, .hero-pair.unarmed .blade { display: none; }
+.blood-pool { position: absolute; bottom: 0; left: 66%; width: clamp(140px, 24vw, 280px); height: 30px; transform: translateX(-50%) scale(0); transform-origin: 30% 50%; border-radius: 50%; background: #c4161c; border: 3px solid #2a1a10; z-index: 0; transition: transform 1.6s ease-out; }
+.blood-pool.show { transform: translateX(-50%) scale(1); }
+/* Tom's win: Theseus hides in a bush, and the party Hydra gobbles him up */
+.bush { position: absolute; bottom: 0; left: 50%; height: 42%; transform: translateX(-50%); opacity: 0; transition: opacity .5s; z-index: 1; pointer-events: none; }
+.bush.show { opacity: 1; }
+.bush svg { display: block; height: 100%; width: auto; }
+.bush .peeker { transition: transform .25s; }
+.bush.scared .peeker { animation: peek-shake .12s linear infinite alternate; }
+@keyframes peek-shake { from { transform: translateX(-3px); } to { transform: translateX(3px); } }
+.bush.eaten .peeker { animation: none; transform: translateY(-130px) scale(.4); opacity: 0; transition: transform .35s ease-in, opacity .2s .15s; }
+.bush.eaten .bush-art { animation: rustle .15s linear 4 alternate; }
+@keyframes rustle { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+.party .spotted { position: absolute; top: -4%; left: 30%; font: 900 clamp(40px, 6vw, 64px)/1 Georgia, serif; color: #b3261e; opacity: 0; transform: scale(.4); transition: opacity .2s, transform .2s; }
+.party.spot .spotted { opacity: 1; transform: scale(1); }
+.party.chomp .spotted { opacity: 0; }
+.party.chomp svg { transform-origin: 85% 100%; animation: lunge 1.3s ease-in-out forwards; }
+@keyframes lunge { 0% { transform: none; } 40% { transform: translateX(-34%) translateY(10%) rotate(-24deg); } 60% { transform: translateX(-34%) translateY(10%) rotate(-24deg); } 100% { transform: none; } }
+.party.chomp .hh { animation: none; }
 
+.hero:not(.in), .party:not(.in) { visibility: hidden; }  /* waiting off stage: his sword must not poke in */

@@ -1,5 +1,5 @@
 // Offline support. Bump VERSION whenever app files change so devices pick up the update.
-const VERSION = 'notes-v48';
+const VERSION = 'notes-v49';
 const SHELL = [
   './', 'index.html', 'styles.css', 'glyphs.js', 'music.js', 'listen.js', 'beast.js', 'challenge.js', 'content.js', 'app.js', 'config.js', 'manifest.webmanifest',
   ...['A1', 'C2', 'Ds2', 'Fs2', 'A2', 'C3', 'Ds3', 'Fs3', 'A3', 'C4', 'Ds4', 'Fs4', 'A4', 'C5', 'Ds5', 'Fs5', 'A5', 'C6', 'Ds6', 'Fs6', 'A6'].map(n => `piano/${n}.mp3`),
