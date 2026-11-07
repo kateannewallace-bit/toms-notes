@@ -494,3 +494,6 @@ body.game-mode .board > * { flex: none; }
 .party.chomp .hh { animation: none; }
 
 .hero:not(.in), .party:not(.in) { visibility: hidden; }  /* waiting off stage: his sword must not poke in */
+.speed-row { align-items: center; gap: 10px; }
+.speed-row input[type="range"] { flex: 1 1 200px; max-width: 320px; accent-color: #111; height: 32px; border: none; background: transparent; padding: 0; box-shadow: none; }
+

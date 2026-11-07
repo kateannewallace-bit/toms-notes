@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -221,6 +221,7 @@ function say(text) {
 }
 
 /* ---------- Note Beast Challenge settings (grown-ups page) ---------- */
+const speedNote = () => `At level ${challengeLevel()}, the Note Beast now takes about ${Math.round(passSeconds())} seconds to cross. ${(state.challengeSpeed || 5) === 5 ? 'The middle setting lets each level set the speed: a little quicker after every win.' : 'Each win still makes it a little quicker from here.'}`;
 function renderChallengeSettings(seg) {
   const chosen = !!state.challengeNotes, picked = new Set(state.challengeNotes || []);
   const showClefs = ['t', 'b', 'a', 'n'].filter(challengeClefOk);
@@ -231,6 +232,8 @@ function renderChallengeSettings(seg) {
     <p class="note">These are for ${esc(N())}'s Challenge only.</p>
     <div class="row-btns"><span>Clefs</span><div class="seg">${['t', 'b', 'a', 'n'].map(c => `<button data-act="cclef" data-v="${c}" aria-pressed="${challengeClefOk(c)}">${CLEF_NAMES[c].replace(' clef', '')}</button>`).join('')}</div></div>
     <p class="note">Tap to switch each clef on or off. Treble and bass to start; alto and tenor are the C clefs, whose middle points at Middle C.</p>
+    <div class="row-btns speed-row"><label for="cspeed">Speed</label><span class="small-link">Slower</span><input type="range" id="cspeed" min="1" max="9" step="1" value="${state.challengeSpeed || 5}"><span class="small-link">Faster</span></div>
+    <p class="note" id="cspeed-note">${speedNote()}</p>
     <div class="row-btns"><span>Endings</span>${seg('loseend', state.loseEnding === 'theseus' ? 'theseus' : 'sulk', [['sulk', 'Standard'], ['theseus', 'Theseus and the Hydra']])}</div>
     <p class="note">Standard: winning, the Note Beast cheers and gets a golden laurel wreath; losing, the Note Beast sits down to sulk in the labyrinth under a rain cloud. Theseus and the Hydra: winning, the laurel wreath and then a party with the Hydra; losing, Theseus, the hero from the old story, runs in and slays the Note Beast with his sword, leaving it stuck in the Note Beast with cartoon blood.</p>
     <div class="row-btns"><span>Notes</span>${seg('cmode', chosen ? 1 : 0, [[0, 'Automatic'], [1, 'Choose notes']])}</div>
@@ -1364,7 +1367,8 @@ function hearSong() {
 /* ---------- rendering ---------- */
 const app = document.getElementById('app');
 const speakerIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
-const starSvg = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 16.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="${on ? 'var(--yellow)' : 'none'}" stroke="${on ? 'var(--yellow)' : 'var(--chalk-dim)'}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+// Gold stars for right answers and songs (the theme's --yellow is black, so they use their own gold).
+const starSvg = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 16.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="${on ? '#f3c94a' : 'none'}" stroke="${on ? '#b8902a' : 'var(--chalk-dim)'}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 function fmtDate(iso) { try { return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return ''; } }
 function levelBar(k) {
   const max = maxLevel(k), L = levelNow(k), r = state.rec[k] || [];
@@ -1884,7 +1888,7 @@ const ACTIONS = {
   'topic-reset-yes'(d) { resetTopic(d.k); confirmTopic = null; save(); render(); },
   wipe() { confirmWipe = true; render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },
@@ -1931,6 +1935,13 @@ let dragging = false;
 app.addEventListener('pointerdown', e => { if (e.target.closest?.('svg[data-live]')) { audioReady(); dragging = true; e.preventDefault(); placeAt(e); } });
 app.addEventListener('pointermove', e => { if (dragging) placeAt(e); });
 window.addEventListener('pointerup', () => { dragging = false; });
+// the Challenge speed slider: saves as it moves, without redrawing the page
+app.addEventListener('input', e => {
+  if (e.target.id !== 'cspeed') return;
+  state.challengeSpeed = +e.target.value; save();
+  const note = document.getElementById('cspeed-note');
+  if (note) note.textContent = speedNote();
+});
 app.addEventListener('submit', e => {
   e.preventDefault();
   if (e.target.id === 'new-player') {

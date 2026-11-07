@@ -69,7 +69,12 @@ function nextPlacard() {
 // the next level a little quicker: about six seconds by level 7, and never quicker than about four.
 const PHASE_MS = { in: 2700, wait: 3600, out: 2700, scowl: 1200, flee: 900, fly: 1000, aghast: 1300, hero: 1500, strike: 900, felled: 2900, slump: 4800, celebrate: 5600 };
 const challengeLevel = () => (state.challenge?.wins || 0) + 1;
-const lapSpeed = () => Math.max(.45, 1 - (challengeLevel() - 1) * .056);
+// The grown-ups' speed slider (state.challengeSpeed, 1 to 9, 5 = as the level sets it) scales the whole pass:
+// each step is about 19% quicker or slower, so 1 takes about twice as long and 9 about half as long.
+const speedScale = () => Math.pow(2, (5 - (state.challengeSpeed || 5)) / 4);
+const lapSpeed = () => Math.max(.45, 1 - (challengeLevel() - 1) * .056) * speedScale();
+// Seconds for one pass, from when he appears to when he's gone, for the grown-ups page.
+const passSeconds = () => (PHASE_MS.in + PHASE_MS.wait + PHASE_MS.out) * lapSpeed() / 1000;
 function challengeFrame(now) {
   if (!game || screen !== 'challenge') return;
   const ms = (game.phase === 'celebrate' && state.loseEnding === 'theseus' ? 8200 : PHASE_MS[game.phase]) * (['in', 'wait', 'out'].includes(game.phase) ? lapSpeed() : 1), t = Math.min(1, (now - game.t0) / ms);
