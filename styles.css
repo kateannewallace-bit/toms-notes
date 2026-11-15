@@ -583,4 +583,26 @@ body.game-mode .board > * { flex: none; }
 .walk-arrow { animation: arrow-bounce .6s ease-in-out infinite alternate; }
 @keyframes arrow-bounce { from { transform: translateY(-5px); } to { transform: translateY(1px); } }
 @media (prefers-reduced-motion: reduce) { .walk-arrow { animation: none; } }
+/* Note Flashcards */
+.flash-letters { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.flash-pick { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 8px; border: 2px solid var(--chalk); border-radius: 12px; background: #fff; }
+.flash-pick .fl { font-size: 2.6rem; font-weight: 900; line-height: 1; }
+.flash-pick small { font-size: .85rem; opacity: .7; min-height: 1.1em; }
+.flash-pick.done { border-color: var(--green); }
+.flash-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; margin: 8px 0 12px; }
+.flash-cards.one { grid-template-columns: minmax(0, 420px); justify-content: center; }
+.flash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: #fff; border: 2px solid var(--chalk); border-radius: 16px; padding: 16px; box-shadow: 0 3px 0 rgba(17,17,17,.12); min-height: 220px; }
+.flash-card svg { width: 100%; max-width: 320px; height: auto; }
+.flash-card .this-is { font-size: 1.4rem; }
+.flash-card .big-letter { font-size: clamp(5rem, 14vw, 8rem); font-weight: 900; line-height: 1; color: var(--blue); }
+.flash-where { font-size: .95rem; text-align: center; opacity: .8; }
+.flash-prompt { text-align: center; font-size: 1.25rem; font-weight: 700; margin: 6px 0; }
+.flash-every svg { width: 100%; max-width: 640px; height: auto; display: block; margin: 0 auto; }
+.flash-keys { max-width: none; width: 100%; }
+.flash-keys svg { width: 100%; height: auto; display: block; }
+.flash-rotate { display: none; align-items: center; justify-content: center; gap: 10px; padding: 10px; margin: 6px 0; border: 2px dashed var(--chalk); border-radius: 10px; font-weight: 700; }
+.flash-rotate span { font-size: 1.6rem; }
+@media (orientation: portrait) { .flash-rotate { display: flex; } }
 
+body.flash-mode .wrap { max-width: 1240px; }
+body.flash-mode .board { padding-inline: clamp(10px, 2vw, 22px); }

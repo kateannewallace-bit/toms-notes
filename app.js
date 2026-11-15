@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, walkLo: 'C2', walkHi: 'C6', walkMode: 'steps', walkAnswer: 'letters', walkCount: 50, updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, walkLo: 'C2', walkHi: 'C6', walkMode: 'steps', walkAnswer: 'letters', walkCount: 50, flash: {}, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -1559,6 +1559,10 @@ function renderHome() {
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section class="challenge-card">
+    <div><h2>Note Flashcards</h2><p class="note">Meet one note at a time, then find every one of it on the staff and the keyboard.</p></div>
+    <button class="start" data-act="flash-menu">Open</button>
+  </section>
+  <section class="challenge-card">
     <div><h2>Note Beast On The High Seas</h2><p class="note">Name ${state.walkCount || 50} notes ${state.walkMode === 'jump' ? 'jumping around' : 'stepping up and down'}, ${(state.walkLo || 'C2') === 'C2' && (state.walkHi || 'C6') === 'C6' ? 'from the C above the treble staff to the C below the bass staff' : `between ${state.walkLo} and ${state.walkHi}`}, while Note Beast rows from Crete to Athens.${state.walks?.plays && (state.walks.bestBy?.[state.walkCount || 50] ?? (+(state.walkCount || 50) === 50 ? state.walks.best : null)) != null ? ` Best: ${state.walks.bestBy?.[state.walkCount || 50] ?? state.walks.best} of ${state.walkCount || 50} on the first try.` : ''}</p></div>
     <button class="start" data-act="walk">Row</button>
   </section>
@@ -1933,7 +1937,8 @@ function render(shake) {
   // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
   document.body.classList.toggle('song-mode', screen === 'song');
   document.body.classList.toggle('game-mode', screen === 'challenge');
-  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : screen === 'stories' ? renderStories() : screen === 'story' ? renderStory() : screen === 'walk' ? renderWalk() : renderHome();
+  document.body.classList.toggle('flash-mode', screen === 'flash');
+  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : screen === 'stories' ? renderStories() : screen === 'story' ? renderStory() : screen === 'walk' ? renderWalk() : screen === 'flashmenu' ? renderFlashMenu() : screen === 'flash' ? renderFlash() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
   if (screen === 'walk' && walk?.phase !== 'done') drawWalk();
@@ -2084,6 +2089,7 @@ app.addEventListener('click', e => {
     if (screen === 'song') { if (!state.realPiano) songTap(+key.dataset.midi); return; }
     if (screen === 'challenge') { challengeKey(+key.dataset.midi); return; }
     if (screen === 'walk') { walkKey(+key.dataset.midi); return; }
+    if (screen === 'flash') { flashKey(+key.dataset.midi); return; }
     if (screen === 'play' && key.closest('.key-wrap.live')) tapKey(+key.dataset.midi);
     return;
   }
