@@ -552,7 +552,7 @@ function findCProblem(p, it) {
   p.misses = 0;
   const ok = x => x !== target && letterOf(stepOf(x)) !== letterOf(stepOf(target));
   if (grand) {
-    // other notes spread over both staffs, each pitch only once
+    // other notes spread over both staves, each pitch only once
     const pool = shuffle([...STAFF_WHITES.t.map(x => ['t', x]), ...STAFF_WHITES.b.map(x => ['b', x])].filter(([, x]) => ok(x)));
     const others = [];
     for (const [c, x] of pool) { if (others.length >= count - 1) break; if (!others.some(o => o[1] === x) && (others.length % 2 === 0 ? c === 't' : c === 'b' || pool.every(([cc]) => cc === 't'))) others.push([c, x]); }
@@ -574,7 +574,7 @@ function findCProblem(p, it) {
 function findCStaff(p) {
   const cls = x => p.step === 'clef' ? '' : x === p.target && p.done ? 'ok' : p.tapped.includes(x) ? 'try' : '';
   if (p.grand) {
-    // one column per notehead across both staffs, like real piano music
+    // one column per notehead across both staves, like real piano music
     const on = c => p.placed.map(o => o[0] === c ? { p: o[1], d: 'w', cls: cls(o[1]) } : { skip: 1, d: 'w' });
     return grandSvg({ S: 17, width: 440, t: on('t'), b: on('b'), even: true, cl: 'findc-grand' });
   }
@@ -711,7 +711,7 @@ function basicProblem(p, it) {
   } else {
     const c = rng() < .5 ? 't' : 'b', it2 = [{ p: 'C4', d: 'w', cls: 'now' }];
     p.vis = grandSvg({ S: 13, width: 340, t: c === 't' ? it2 : [], b: c === 'b' ? it2 : [] });
-    p.prompt = 'This blue note sits between the two staffs. What is it?';
+    p.prompt = 'This blue note sits between the two staves. What is it?';
     p.choices = [['Middle C', true], ['The G line', false], ['The F line', false]].map(([t, ok]) => ({ t, ok }));
     p.hearP = 'C4';
     p.answerText = () => `Middle C, on its own ledger line ${c === 't' ? 'just below the treble staff' : 'just above the bass staff'}.`;
@@ -1484,12 +1484,23 @@ function adjustLevels(used) {
 
 /* ---------- songs ---------- */
 function parseSong(s) {
-  const bars = s.notes.split('|').map(b => b.trim().split(/\s+/).map(tok => { const [p, d] = tok.split(':'); return { p, d }; }));
-  return { bars, flat: bars.flat() };
+  // a token is pitch:duration, or r:duration for a rest; flat holds only the notes to play, in order
+  const bars = s.notes.split('|').map(b => b.trim().split(/\s+/).map(tok => { const [p, d] = tok.split(':'); return p === 'r' ? { r: d } : { p, d }; }));
+  return { bars, flat: bars.flat().filter(x => x.p) };
 }
 function openSong(id) {
   audioReady();
-  const s = SONGS.find(x => x.id === id), { bars, flat } = parseSong(s);
+  const s0 = SONGS.find(x => x.id === id);
+  // a song written as a full score (key signature, two voices, chords): see score.js
+  if (s0.score) {
+    const score = parseScore(s0), steps = score.all.filter(e => !e.rest).flatMap(e => e.pitches.map(stepOf));
+    const lo = Math.min(...steps), hi = Math.max(...steps);
+    if (listenMode()) startMic();
+    song = { s: s0, score, flat: score.moments, i: 0, hit: [], misses: 0, letters: false, from: lo - 1, whites: Math.max(8, hi - lo + 3), flash: null, playing: -1 };
+    screen = 'song'; render();
+    return;
+  }
+  const s = s0, { bars, flat } = parseSong(s);
   const steps = flat.map(x => stepOf(x.p));
   const lo = Math.min(...steps), hi = Math.max(...steps);
   if (listenMode()) startMic();
@@ -1497,12 +1508,14 @@ function openSong(id) {
   screen = 'song'; render();
 }
 function songTap(midi) {
+  if (song?.score) return scoreTap(midi);
   if (!hearing()) tone(midi);
   if (!song || song.playing >= 0 || song.i >= song.flat.length) return;
   const want = midiOf(song.flat[song.i].p);
-  if (hearing() ? midi % 12 === want % 12 : midi === want) { song.flash = null; song.i++; if (song.i >= song.flat.length) finishSong(); }
-  else { song.misses++; song.flash = `That’s ${keyName(midi)}.`; }
-  render(midi !== want);
+  // the right letter in any octave counts (Katie: any G will do); a wrong key waits, and after two tries the key lights up
+  if (midi % 12 === want % 12) { song.flash = null; song.missHere = 0; song.i++; if (song.i >= song.flat.length) finishSong(); }
+  else { song.misses++; song.missHere = (song.missHere || 0) + 1; song.flash = null; }
+  render(midi % 12 !== want % 12);
 }
 function finishSong() {
   const r = state.songs[song.s.id] = state.songs[song.s.id] || { plays: 0, best: null };
@@ -1511,11 +1524,14 @@ function finishSong() {
   save();
 }
 function hearSong() {
+  if (song.score) return scoreHear();
   if (song.playing >= 0) { hush(); song.playing = -1; render(); return; }
-  const list = song.flat.map(x => ({ midi: midiOf(x.p), beats: BEATS[x.d] }));
+  // rests sound as silence; the cursor follows the notes only
+  const all = song.bars.flat(), list = all.map(x => ({ midi: x.p ? midiOf(x.p) : null, beats: BEATS[x.d || x.r] }));
+  const noteAt = []; let n = 0; all.forEach(x => noteAt.push(x.p ? n++ : -2));
   song.playing = 0;
   render();
-  playSeq(list, 90, i => { if (screen !== 'song') return; song.playing = i; render(); }, { perBar: song.s.time[0] });
+  playSeq(list, 90, i => { if (screen !== 'song') return; if (i >= 0 && noteAt[i] < 0) return; song.playing = i < 0 ? -1 : noteAt[i]; render(); }, { perBar: song.s.time[0] });
 }
 
 /* ---------- rendering ---------- */
@@ -1559,7 +1575,7 @@ function renderHome() {
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section class="challenge-card">
-    <div><h2>Note Flashcards</h2><p class="note">Meet one note at a time, then find every one of it on the staff and the keyboard.</p></div>
+    <div><h2>Note Flashcards</h2><p class="note">Meet one note at a time, then find it everywhere on the music and the piano.</p></div>
     <button class="start" data-act="flash-menu">Open</button>
   </section>
   <section class="challenge-card">
@@ -1576,11 +1592,11 @@ function renderHome() {
   </section>
   <section>
     <h2>Songs to play</h2>
-    <div class="songs">${SONGS.map(s => { const r = state.songs[s.id]; return `<button class="song-btn" data-act="song" data-id="${s.id}">${r ? starSvg(r.best === 0) : starSvg(false)}<span><strong>${esc(s.name)}</strong><small>${esc(s.tag)}</small></span></button>`; }).join('')}</div>
+    <div class="songs">${SONGS.map(s => { const r = state.songs[s.id]; return `<button class="song-btn" data-act="song" data-id="${s.id}">${r ? starSvg(r.best === 0) : starSvg(false)}<span><strong>${esc(s.name)}</strong></span></button>`; }).join('')}</div>
   </section>
   <p class="meta">${todayCount ? `${todayCount} questions so far today. ` : ''}${state.total} answered since the start.</p>`;
 }
-// The Note Map: every note the app teaches, named, on both staffs. Tap a note to hear it.
+// The Note Map: every note the app teaches, named, on both staves. Tap a note to hear it.
 // On the Note Map, a tapped note and its letter light up while it sounds.
 let lit = null;
 function lightUp(note) {
@@ -1610,7 +1626,7 @@ function renderMap() {
     <section><h2>High bass notes</h2><div class="map-scroll">${row('b', 'D4', 'G4')}</div></section>
     <section><h2>Low bass notes</h2><div class="map-scroll">${row('b', 'A1', 'E2')}</div></section>
   </details>
-  <section><h2>The two staffs together</h2><div class="staff-wrap">${grandSvg({ S: 14, width: 420, t: [{ p: 'C4', d: 'w', cls: 'now' }, { p: 'G4', d: 'w' }], b: [{ p: 'F3', d: 'w' }, { p: 'C4', d: 'w', cls: 'now' }] })}</div>
+  <section><h2>The two staves together</h2><div class="staff-wrap">${grandSvg({ S: 14, width: 420, t: [{ p: 'C4', d: 'w', cls: 'now' }, { p: 'G4', d: 'w' }], b: [{ p: 'F3', d: 'w' }, { p: 'C4', d: 'w', cls: 'now' }] })}</div>
   <p class="note">Treble G sits on the line the treble clef curls around. Bass F sits on the line between the bass clef’s dots. Middle C can be written just below the treble staff or just above the bass staff: the same key either way.</p></section>`;
 }
 // Who's playing: one big button per player, and a way to add another.
@@ -1819,6 +1835,7 @@ function renderDone() {
   <div class="row-btns"><button class="start" data-act="start">Again!</button><button class="ghost" data-act="home">Home</button></div>`;
 }
 function renderSong() {
+  if (song.score) return renderScoreSong();
   const { s, bars, flat, i, letters, playing } = song, finished = i >= flat.length;
   const cursor = playing >= 0 ? playing : i;
   let idx = 0, linesHtml = '';
@@ -1827,7 +1844,7 @@ function renderSong() {
     const lineBars = bars.slice(b, b + 2);
     const noteIdx = [];
     lineBars.forEach((bar, bi) => {
-      bar.forEach(x => { noteIdx.push(idx); items.push({ p: x.p, d: x.d, cls: idx === cursor && !finished ? 'now' : idx < i ? 'played' : '' }); idx++; });
+      bar.forEach(x => { if (x.r) { items.push({ r: x.r }); return; } noteIdx.push(idx); items.push({ p: x.p, d: x.d, cls: idx === cursor && !finished ? 'now' : idx < i ? 'played' : '' }); idx++; });
       items.push({ bar: b + bi === bars.length - 1 ? 'end' : 1 });
     });
     const notesOnly = items.filter(x => x.p);
@@ -1837,6 +1854,8 @@ function renderSong() {
   const wantMidi = !finished && playing < 0 ? midiOf(flat[i].p) : null;
   const pm = {};
   if (playing >= 0) pm[midiOf(flat[playing].p)] = 'ok';
+  // after two wrong keys on the same note, its key lights up
+  if (!finished && playing < 0 && song.missHere >= 2) pm[midiOf(flat[i].p)] = 'hl';
   return `<header class="top"><h1 class="song-title">${esc(s.name)}</h1><button class="ghost" data-act="home">Songs</button></header>
   <p class="note">${esc(s.tag)} ${hearing() || state.realPiano ? 'Play along on your piano.' : 'Read each note and tap its key.'}</p>
   <div class="row-btns song-ctrl"><button class="ghost" data-act="song-hear">${playing >= 0 ? '■ Stop' : '♪ Hear the song'}</button><button class="ghost" data-act="song-letters" aria-pressed="${letters}">${letters ? 'Hide letters' : 'Show letters'}</button><button class="ghost" data-act="song-restart">From the top</button></div>
@@ -2039,8 +2058,8 @@ const ACTIONS = {
   map() { audioReady(); screen = 'map'; render(); window.scrollTo?.({ top: 0 }); },
   'song-hear'() { hearSong(); },
   'song-letters'() { song.letters = !song.letters; render(); },
-  'song-restart'() { hush(); song.i = 0; song.misses = 0; song.flash = null; song.playing = -1; render(); },
-  'song-next'() { const x = song.flat[song.i]; playP(x.p, Math.max(.6, BEATS[x.d])); song.i++; if (song.i >= song.flat.length) finishSong(); render(); },
+  'song-restart'() { hush(); song.i = 0; song.hit = []; song.missHere = 0; song.misses = 0; song.flash = null; song.playing = -1; render(); },
+  'song-next'() { if (song.score) return scoreNext(); const x = song.flat[song.i]; playP(x.p, Math.max(.6, BEATS[x.d])); song.i++; if (song.i >= song.flat.length) finishSong(); render(); },
   lvl(d) { const v = Math.max(1, Math.min(maxLevel(d.k), levelNow(d.k) + +d.d)); state.levels[d.k] = v; state.rec[d.k] = []; save(); render(); },
   per(d) { state.perSession = +d.n; save(); render(); },
   autospeak(d) { state.autoSpeak = d.v === '1'; save(); render(); },

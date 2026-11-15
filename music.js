@@ -143,26 +143,34 @@ function staffSvg(o) {
   const total = items.reduce((t, i) => t + weight(i), 0) || 1;
   let x = x0;
   const placed = items.map(i => { const a = weight(i) / total * room, at = o.noteX && items.length === 1 ? o.noteX : x + (i.bar ? a : o.even ? a / 2 : Math.min(a / 2, S * 1.6)); x += a; return at; });
-  // eighth notes beam in pairs
-  const pairs = new Map();
-  for (let i = 0; i < items.length - 1; i++) {
-    if (items[i].p && items[i].d === 'e' && items[i + 1].p && items[i + 1].d === 'e' && !pairs.has(i)) { pairs.set(i, i + 1); pairs.set(i + 1, -1); i++; }
+  // eighth notes beam in pairs; a run of exactly three (like Beethoven's da-da-da) beams as one group
+  const groups = new Map(), inGroup = new Set();
+  for (let i = 0; i < items.length; i++) {
+    if (!(items[i].p && items[i].d === 'e')) continue;
+    let j = i; while (j + 1 < items.length && items[j + 1].p && items[j + 1].d === 'e') j++;
+    const run = []; for (let k = i; k <= j; k++) run.push(k);
+    if (run.length === 3) groups.set(i, run);
+    else for (let k = 0; k + 1 < run.length; k += 2) groups.set(run[k], [run[k], run[k + 1]]);
+    for (const g of groups.values()) g.forEach(k => inGroup.add(k));
+    i = j;
   }
+  const pairs = { has: i => inGroup.has(i) };
   items.forEach((it, i) => {
     const at = placed[i];
-    if (it.skip) return;  // an empty column, so notes line up across the two staffs of a grand staff
+    if (it.skip) return;  // an empty column, so notes line up across the two staves of a grand staff
     if (it.bar) {
       if (it.bar === 'end') out += `<line class="st-bar" x1="${at - 5}" x2="${at - 5}" y1="${yTop}" y2="${yTop + staffH}"/><rect class="n-head" x="${at - 1}" y="${yTop}" width="4" height="${staffH}"/>`;
       else out += `<line class="st-bar" x1="${at}" x2="${at}" y1="${yTop}" y2="${yTop + staffH}"/>`;
     } else if (it.r) out += drawRest(it.r, at, S, Y, c, it.cls);
     else if (it.gap) out += `<rect class="gap-box" x="${at - S * 1.1}" y="${yTop + S * .3}" width="${S * 2.2}" height="${staffH - S * .6}" rx="5"/>`;
-    else if (pairs.has(i) && pairs.get(i) > 0) {
-      const j = pairs.get(i), si = stepOf(it.p), sj = stepOf(items[j].p), mid = bottom + 4;
-      const up = (si + sj) / 2 < mid;
-      const end = up ? Math.min(Y(si), Y(sj)) - S * 3.2 : Math.max(Y(si), Y(sj)) + S * 3.2;
-      const a = drawNote(c, at, si, 'e', S, Y, { cls: it.cls, up, stemTo: end, beamed: true, acc: it.acc });
-      const b = drawNote(c, placed[j], sj, 'e', S, Y, { cls: items[j].cls, up, stemTo: end, beamed: true, acc: items[j].acc });
-      out += tapNote(a.svg, it, at, Y(si), S) + tapNote(b.svg, items[j], placed[j], Y(sj), S) + `<rect class="n-head" x="${Math.min(a.stem.x, b.stem.x) - S * .07}" y="${up ? end : end - S * .45}" width="${Math.abs(b.stem.x - a.stem.x) + S * .14}" height="${S * .45}"/>`;
+    else if (groups.has(i)) {
+      const g = groups.get(i), ss = g.map(k => stepOf(items[k].p)), mid = bottom + 4;
+      const up = ss.reduce((t, x) => t + x, 0) / ss.length < mid;
+      const end = up ? Math.min(...ss.map(Y)) - S * 3.2 : Math.max(...ss.map(Y)) + S * 3.2;
+      const drawn = g.map((k, n) => drawNote(c, placed[k], ss[n], 'e', S, Y, { cls: items[k].cls, up, stemTo: end, beamed: true, acc: items[k].acc }));
+      out += g.map((k, n) => tapNote(drawn[n].svg, items[k], placed[k], Y(ss[n]), S)).join('');
+      const x0 = drawn[0].stem.x, x1 = drawn.at(-1).stem.x;
+      out += `<rect class="n-head" x="${Math.min(x0, x1) - S * .07}" y="${up ? end : end - S * .45}" width="${Math.abs(x1 - x0) + S * .14}" height="${S * .45}"/>`;
     } else if (!pairs.has(i)) out += tapNote(drawNote(c, at, stepOf(it.p), it.d, S, Y, { cls: it.cls, acc: it.acc, noStem: it.noStem }).svg, it, at, Y(stepOf(it.p)), S);
   });
   // the walk: notes climbing from the landmark to the note, each with its letter just above it; hint mode hides the last one.
@@ -192,10 +200,10 @@ function staffSvg(o) {
   const live = o.live ? ` data-live="1" data-c="${c}" data-lo="${o.lo}" data-hi="${o.hi}" data-ytop="${yTop}" data-s="${S}"` : '';
   return `<svg class="staff ${o.cl || ''}" viewBox="0 0 ${w} ${Math.ceil(h)}"${live} role="img" aria-label="${o.label || 'Music staff'}">${out}${o.live ? `<g id="placed">${o.placed || ''}</g><rect class="live-hit" x="0" y="0" width="${w}" height="${Math.ceil(h)}"/>` : ''}</svg>`;
 }
-// Two staffs joined by a brace and a line at the left: treble on top, bass below.
+// Two staves joined by a brace and a line at the left: treble on top, bass below.
 function grandSvg(o) {
   const S = o.S || 14, w = o.width || 360, L = S * 1.7;
-  // tHi / bLo fix the room above and below, so a moving line of notes doesn't make the staffs jump; extraT / extraB draw on each staff
+  // tHi / bLo fix the room above and below, so a moving line of notes doesn't make the staves jump; extraT / extraB draw on each staff
   const top = staffSvg({ clef: 't', S, width: w - L, even: o.even, items: o.t || [], lo: Math.min(stepOf('C4'), ...(o.t || []).filter(i => i.p).map(i => stepOf(i.p))), hi: o.tHi, extra: o.extraT, parts: true });
   const low = staffSvg({ clef: 'b', S, width: w - L, even: o.even, items: o.b || [], hi: Math.max(stepOf('C4'), ...(o.b || []).filter(i => i.p).map(i => stepOf(i.p))), lo: o.bLo, extra: o.extraB, parts: true });
   const y0 = top.yTop, y1 = top.h + low.yTop + low.staffH, [bx0, by0, bx1, by1] = GLYPHS.brace.b, ky = (y1 - y0) / (by1 - by0), kx = Math.min(ky, S * 1.25 / (bx1 - bx0));

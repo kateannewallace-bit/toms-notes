@@ -32,8 +32,8 @@ function openFlash(L) {
 function renderFlashMenu() {
   const done = new Set(flashDone());
   return `<header class="top"><h1>Note Flashcards</h1><button class="ghost" data-act="home">Back</button></header>
-  <p class="note">One note at a time: meet it, find every one of it on the staff and the keyboard, then a quick review.</p>
-  <div class="flash-letters">${FLASH_ORDER.map(L => `<button class="flash-pick ${done.has(L) ? 'done' : ''}" data-act="flash" data-l="${L}"><span class="fl">${L}</span><small>${done.has(L) ? '✓ done' : FLASH_MEET[L][1] === 'C4' ? 'Middle C and more' : L === 'G' ? 'treble G' : L === 'F' ? 'bass F' : ''}</small></button>`).join('')}</div>`;
+  <p class="note">Pick a note. Meet it, find it on the piano, then play a quick game.</p>
+  <div class="flash-letters">${FLASH_ORDER.map(L => `<button class="flash-pick ${done.has(L) ? 'done' : ''}" data-act="flash" data-l="${L}"><span class="fl">${L}</span><small>${done.has(L) ? '✓ done' : ''}</small></button>`).join('')}</div>`;
 }
 
 function flashStaff(items, o = {}) {
@@ -44,24 +44,24 @@ function flashStaff(items, o = {}) {
 }
 
 function renderFlash() {
-  const f = flash, L = f.L, head = `<header class="top"><h1>${f.step === 'review' ? 'Quick review' : f.step === 'every' ? `Every ${L}` : f.step === 'done' ? 'Well done!' : `Meet ${L}`}</h1><button class="ghost" data-act="flash-menu">All notes</button></header>`;
+  const f = flash, L = f.L, head = `<header class="top"><h1>${f.step === 'review' ? 'Quick game' : f.step === 'every' ? `Every ${L}` : f.step === 'done' ? 'Well done!' : `Meet ${L}`}</h1><button class="ghost" data-act="flash-menu">All notes</button></header>`;
   const rotate = `<div class="flash-rotate"><span>↻</span> Turn the iPad sideways to see the whole keyboard.</div>`;
   if (f.step === 'meet') {
     const [c, p] = FLASH_MEET[L];
     return `${head}<div class="flash-cards">
-      <div class="flash-card flash-word"><span class="this-is">This is</span><span class="big-letter">${L}</span>${p === 'C4' ? '<span class="this-is">Middle C</span>' : ''}</div>
-      <div class="flash-card">${flashStaff([[c, p]], { S: 18, width: 300, cls: () => 'now' })}<span class="flash-where">${esc(flashWhere(c, p))}</span></div>
+      <div class="flash-card flash-word"><div class="this-is">This is</div><div class="big-letter">${L}</div>${p === 'C4' ? '<div class="this-is">Middle C</div>' : ''}</div>
+      <div class="flash-card">${flashStaff([[c, p]], { S: 18, width: 300, cls: () => 'now' })}<div class="flash-where">${esc(flashWhere(c, p))}</div></div>
     </div>
     <div class="next-row"><button class="ghost" data-act="flash-hear">♪ Hear it</button><button class="start" data-act="flash-every">Find every ${L} →</button></div>`;
   }
   if (f.step === 'every') {
     const notes = flashNotes(L), all = f.found.length === notes.length;
     const marks = {}; f.found.forEach(m => { marks[m] = 'ok'; }); if (f.wrongKey != null) marks[f.wrongKey] = 'no';
-    return `${head}${rotate}<p class="flash-prompt">${all ? `You found all ${notes.length} ${L}s!` : `There are ${notes.length} ${L}s on the staff. Find every ${L} on the keyboard.`}</p>
+    return `${head}${rotate}<p class="flash-prompt">${all ? `You found them all!` : `All of these notes are ${L}s. Find each one on the piano!`}</p>
     <div class="staff-wrap flash-every">${flashStaff(notes, { S: 13, width: 600, cls: i => f.found.includes(midiOf(notes[i][1])) ? 'ok' : '' })}</div>
-    <div class="key-wrap live flash-keys">${pianoSvg({ from: FLASH_LO, whites: FLASH_HI - FLASH_LO + 1, letters: 'c', marks })}</div>
+    <div class="key-wrap live flash-keys">${pianoSvg({ from: FLASH_LO, whites: FLASH_HI - FLASH_LO + 1, letters: false, star: false, marks })}</div>
     <div class="feedback">${f.msg ? `<span class="how ${all ? '' : 'try-line'}">${esc(f.msg)}</span>` : ''}</div>
-    ${all ? `<div class="next-row"><button class="start" data-act="flash-review">Quick review →</button></div>` : ''}`;
+    ${all ? `<div class="next-row"><button class="start" data-act="flash-review">Play a quick game →</button></div>` : ''}`;
   }
   if (f.step === 'review') {
     const q = f.qs[f.qi], [c, p] = q.note, right = letterOf(stepOf(p));
@@ -73,15 +73,25 @@ function renderFlash() {
     ${q.done ? `<div class="next-row"><button class="start" data-act="flash-next">${f.qi === f.qs.length - 1 ? 'Done' : 'Next'}</button></div>` : ''}`;
   }
   const next = FLASH_ORDER.find(x => !state.flash?.[x]);
-  return `${head}<div class="flash-cards"><div class="flash-card flash-word"><span class="this-is">You know</span><span class="big-letter">${L}</span></div></div>
+  return `${head}<div class="flash-cards"><div class="flash-card flash-word"><div class="this-is">You know</div><div class="big-letter">${L}</div></div></div>
   <div class="next-row">${next ? `<button class="start" data-act="flash" data-l="${next}">Next: meet ${next} →</button>` : ''}<button class="ghost" data-act="flash-menu">All notes</button></div>`;
 }
-// A plain sentence about where this note sits.
+// Where each note sits, in words a 6-year-old can follow (Katie: the old ones were awkward).
+const FLASH_SPOT = {
+  't:D4': 'just under the treble staff', 't:E4': 'on the bottom line of the treble staff', 't:F4': 'in the bottom space of the treble staff',
+  't:G4': 'on the line the treble clef curls around', 't:A4': 'in the second space of the treble staff', 't:B4': 'on the middle line of the treble staff',
+  't:C5': 'in the third space of the treble staff', 't:D5': 'on the fourth line of the treble staff', 't:E5': 'in the top space of the treble staff',
+  't:F5': 'on the top line of the treble staff', 't:G5': 'just above the treble staff', 't:C4': 'on its own little line, between the two staves',
+  'b:F2': 'just under the bass staff', 'b:G2': 'on the bottom line of the bass staff', 'b:A2': 'in the bottom space of the bass staff',
+  'b:B2': 'on the second line of the bass staff', 'b:C3': 'in the second space of the bass staff', 'b:D3': 'on the middle line of the bass staff',
+  'b:E3': 'in the third space of the bass staff', 'b:F3': 'on the line between the bass clef’s two dots', 'b:G3': 'in the top space of the bass staff',
+  'b:A3': 'on the top line of the bass staff', 'b:B3': 'just above the bass staff', 'b:C4': 'on its own little line, between the two staves',
+};
+const flashSpot = (c, p) => FLASH_SPOT[`${c}:${p}`] || 'here';
+// For the "This is G" card: a whole sentence.
 function flashWhere(c, p) {
-  if (p === 'C4') return 'Middle C, on its own little line between the two staffs.';
-  if (p === 'G4') return 'On the line the treble clef curls around.';
-  if (p === 'F3') return 'On the line between the bass clef’s two dots.';
-  return `${describe(c, stepOf(p)).replace(/^on /, 'On ').replace(/^in /, 'In ').replace(/^just /, 'Just ')}${c === 't' ? ' of the treble staff' : ' of the bass staff'}.`.replace('the staff of the', 'the');
+  const spot = flashSpot(c, p);
+  return p === 'C4' ? `Middle C sits ${spot}.` : `It sits ${spot}.`;
 }
 
 function flashKey(midi) {
@@ -93,11 +103,10 @@ function flashKey(midi) {
     if (!f.found.includes(midi)) f.found.push(midi);
     f.wrongKey = null;
     const left = notes.length - f.found.length;
-    f.msg = left ? `Yes, that’s ${withA(f.L)}! ${left} more to find.` : `All ${notes.length}! Every ${f.L} on the staff has its key.`;
-    if (!left) grunt('happy', .6);
+    f.msg = left ? `Yes, that’s ${withA(f.L)}! ${left === 1 ? 'One more' : `${left} more`} to find.` : `You found every ${f.L}!`;
   } else {
     f.wrongKey = midi;
-    f.msg = `That’s ${isBlack(midi) ? 'a black key' : withA(keyName(midi))}. Look for ${f.L}.`;
+    f.msg = isBlack(midi) ? `That’s a black key. ${f.L} is a white key.` : `That’s ${withA(keyName(midi))}. Look for ${withA(f.L)}.`;
   }
   render();
 }
@@ -122,9 +131,9 @@ function flashLetter(x) {
   if (x === right || q.tries >= 1) {
     if (x !== right) q.wrong.push(x);
     q.done = true;
-    f.msg = x === right ? `${q.tries ? 'There it is' : pick(PRAISE)} ${right}: ${flashWhere(c, p).replace(/\.$/, '').toLowerCase()}.` : `It is ${right}: ${flashWhere(c, p).replace(/\.$/, '').toLowerCase()}.`;
+    f.msg = x === right ? `${q.tries ? 'Yes!' : pick(['Yes!', 'Right!', 'Good job!', 'You got it!'])} It’s ${withA(right)}. It sits ${flashSpot(c, p)}.` : `This one is ${withA(right)}. It sits ${flashSpot(c, p)}.`;
     playP(p, 1.2);
-  } else { q.tries++; q.wrong.push(x); f.msg = `Not ${x}. Try again.`; }
+  } else { q.tries++; q.wrong.push(x); f.msg = `Not ${x}. Look again!`; }
   render(!q.done);
 }
 function flashNext() {
