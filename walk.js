@@ -22,27 +22,30 @@ function makeWalk() {
   const [LO, HI] = walkRange(), mid = Math.min(HI, Math.max(LO, stepOf('C4')));
   // a grown-up setting: notes that jump around anywhere in the range instead of stepping (never the same note twice in a row)
   if (state.walkMode === 'jump') {
-    const steps = [];
-    while (steps.length < WALK_LEN) { let s; do s = LO + Math.floor(Math.random() * (HI - LO + 1)); while (HI > LO && s === steps.at(-1)); steps.push(s); }
+    // 8–12 notes at a time jump around within a stretch of up to 12 white keys, then the stretch moves: over a round the
+    // jumps still reach the whole range, and a keyboard on screen can stay put for each stretch
+    const steps = [], SPAN = Math.min(HI - LO + 1, 12);
+    while (steps.length < WALK_LEN) {
+      const a = LO + Math.floor(Math.random() * (HI - LO + 2 - SPAN)), n = 8 + Math.floor(Math.random() * 5);
+      for (let k = 0; k < n && steps.length < WALK_LEN; k++) { let s; do s = a + Math.floor(Math.random() * SPAN); while (SPAN > 1 && s === steps.at(-1)); steps.push(s); }
+    }
     const clefs = steps.map((s, i) => s > stepOf('C4') ? 't' : s < stepOf('C4') ? 'b' : Math.random() < .5 ? 't' : 'b');
     return { steps, clefs };
   }
-  const up = Math.random() < .5, targets = up ? [HI, LO, mid] : [LO, HI, mid];
+  // Short runs that change direction often (Katie: so the player keeps noticing whether the line went up or down,
+  // rather than covering the whole range): each run is 1 to 4 steps, then it usually turns around; it bounces off the ends.
   const steps = [mid];
-  let turns = 3;
-  for (const t of targets) {
-    while (steps.length < WALK_LEN && steps.at(-1) !== t) {
-      const dir = Math.sign(t - steps.at(-1)), at = steps.at(-1);
-      // a narrow range keeps sweeping back and forth until there are fifty notes
-      // now and then step back once, then carry on (never past the ends, never wasting steps the round needs)
-      const room = WALK_LEN - steps.length - Math.abs(t - at) - (t === targets[2] ? 0 : Math.abs(targets[2] - t));
-      if (turns > 0 && room > 4 && Math.random() < .12 && at - dir >= LO && at - dir <= HI && steps.length > 2) {
-        steps.push(at - dir, at); turns--;
-      } else steps.push(at + dir);
-    }
+  let dir = Math.random() < .5 ? 1 : -1, run = 1 + Math.floor(Math.random() * 4), same = 0;
+  while (steps.length < WALK_LEN) {
+    const at = steps.at(-1);
+    // never more than 6 steps the same way in a row
+    if (run <= 0) { if (Math.random() < .75 || same >= 5) { dir = -dir; same = 0; } run = 1 + Math.floor(Math.random() * 4); }
+    if (same >= 6) { dir = -dir; same = 0; run = 1 + Math.floor(Math.random() * 4); }
+    if (at + dir > HI || at + dir < LO) { dir = -dir; same = 0; run = 1 + Math.floor(Math.random() * 4); }
+    if (at + dir > HI || at + dir < LO) break;  // a one-note range can't step
+    steps.push(at + dir); run--; same++;
   }
-  while (steps.length < WALK_LEN) { const at = steps.at(-1); steps.push(at + (at >= HI ? -1 : at <= LO ? 1 : Math.random() < .5 ? 1 : -1)); }
-  steps.length = WALK_LEN;
+  while (steps.length < WALK_LEN) steps.push(steps.at(-1));
   // Middle C goes on whichever staff the line is already on; everything else on its own staff
   const clefs = [];
   steps.forEach((s, i) => clefs.push(s > stepOf('C4') ? 't' : s < stepOf('C4') ? 'b' : i ? clefs[i - 1] : 't'));
@@ -210,6 +213,7 @@ function drawWalk() {
   el('walk-say').textContent = w.phase === 'play' ? (w.i >= WALK_LEN - 5 ? 'Athens is in sight! ' : '') + (state.walkAnswer === 'keys' ? 'Play the blue note.' : 'Name the blue note.') : '';
   el('walk-keys').classList.toggle('walk-piano', state.walkAnswer === 'keys');
   el('walk-keys').innerHTML = w.phase !== 'play' ? '' : state.walkAnswer === 'keys' ? walkPiano(el('walk-keys')) : ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(L => `<button class="choice ${w.wrong.includes(L) ? 'no' : ''}" data-act="walk-letter" data-v="${L}" ${w.wrong.includes(L) ? 'disabled' : ''}>${L}</button>`).join('');
+  if (el('walk-keys').querySelector('.keys-moved')) el('walk-say').textContent = 'The keyboard moved! Play the blue note.';
   el('walk-msg').innerHTML = w.msg ? `<span class="${w.msgCls || 'how'}">${esc(w.msg)}</span>` : '';
   placeWorld();
   document.getElementById('scene')?.classList.toggle('in-sight', w.i >= WALK_LEN - 5);
@@ -219,31 +223,43 @@ function drawWalk() {
 // (padded out to fill the space); if not, a window of keys that holds the note: stepping, it centers on the note before (so
 // the window gives nothing away); jumping, the note lands somewhere inside it, never right at the edge.
 const WALK_KEY_PX = 46;
+// The keyboard stays put for 8 to 12 notes, so a hand can't just rest in one place: each window is placed to hold the
+// next stretch of notes, somewhere random around them. When it moves, a little glissando plays and the keys flash.
 function walkWindow(width) {
-  const w = walk, [LO, HI] = walkRange(), s = w.steps[w.i];
+  const w = walk, [LO, HI] = walkRange();
   const fit = Math.max(8, Math.min(WALK_HI - WALK_LO + 1, Math.floor(width / WALK_KEY_PX)));
   if (HI - LO + 1 <= fit) {
     let from = LO - Math.floor((fit - (HI - LO + 1)) / 2);
     from = Math.max(WALK_LO, Math.min(from, WALK_HI - fit + 1));
-    return { from, whites: fit };
+    return { from, whites: fit, until: WALK_LEN };
   }
-  let from;
-  if (state.walkMode === 'jump') {
-    const a = Math.max(LO, s - fit + 2), b = Math.min(HI - fit + 1, s - 1);
-    from = a <= b ? a + Math.floor(Math.random() * (b - a + 1)) : Math.max(LO, Math.min(s - Math.floor(fit / 2), HI - fit + 1));
-  } else {
-    const ref = w.i ? w.steps[w.i - 1] : s;
-    from = Math.max(LO, Math.min(ref - Math.floor(fit / 2), HI - fit + 1));
-  }
-  return { from, whites: fit };
+  // as many of the next 8–12 notes as fit on the keys (at least the current one), with a key to spare at each edge when possible
+  let k = Math.min(8 + Math.floor(Math.random() * 5), WALK_LEN - w.i), lo, hi;
+  for (; k >= 1; k--) { const seg = w.steps.slice(w.i, w.i + k); lo = Math.min(...seg); hi = Math.max(...seg); if (hi - lo + 1 <= fit - 2 || k === 1) break; }
+  const a = Math.max(LO, hi - fit + 2), b = Math.min(HI - fit + 1, lo - 1);
+  const from = a <= b ? a + Math.floor(Math.random() * (b - a + 1)) : Math.max(LO, Math.min(lo - Math.floor((fit - (hi - lo + 1)) / 2), HI - fit + 1));
+  return { from, whites: fit, until: w.i + k };
 }
 function walkPiano(box) {
   const w = walk;
-  // one window per note, so it doesn't shift between tries
-  if (w.winAt !== w.i || !w.win) { w.win = walkWindow(box.clientWidth || 720); w.winAt = w.i; }
+  // a new window only when this stretch of notes is used up (or the note somehow isn't on the keys)
+  const want = whiteMidi(w.steps[w.i]);
+  const onKeys = win => win && w.steps[w.i] >= win.from && w.steps[w.i] < win.from + win.whites;
+  if (!w.win || w.i >= w.win.until || !onKeys(w.win)) {
+    const first = !w.win;
+    w.win = walkWindow(box.clientWidth || 720);
+    if (!first) { w.moved = true; if (!hearing()) keysMovedSound(w.win); }
+  }
   const marks = {};
   w.wrong.forEach(m => { if (typeof m === 'number') marks[m] = 'no'; });
-  return `<div class="key-wrap live">${pianoSvg({ from: w.win.from, whites: w.win.whites, letters: 'c', marks })}</div>`;
+  const moved = w.moved; w.moved = false;
+  return `<div class="key-wrap live ${moved ? 'keys-moved' : ''}">${pianoSvg({ from: w.win.from, whites: w.win.whites, letters: 'c', marks })}</div>`;
+}
+// A quick, soft run up the new keys, so it's clear the keyboard has moved.
+function keysMovedSound(win) {
+  const run = [0, 2, 4, 6].map(k => ({ midi: whiteMidi(win.from + Math.min(win.whites - 1, k + 1)), beats: .22, vol: .3 }));
+  setTimeout(() => tone(run[0].midi, 0, .25, .3), 0);
+  run.slice(1).forEach((n, k) => tone(n.midi, .09 * (k + 1), .25, .3));
 }
 function walkKey(midi) {
   const w = walk;
