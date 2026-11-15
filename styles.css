@@ -516,4 +516,17 @@ body.game-mode .board > * { flex: none; }
 .story-w.lit { fill: var(--blue); font-weight: 700; }
 .story-done { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .story-done .stars { justify-content: center; }
+/* the hint walk's noteheads, under each letter */
+.n-head.walk-head { fill: var(--blue); opacity: .75; }
+.n-head.walk-head.mark { fill: var(--blue); opacity: 1; }
+/* Challenge: after two wrong answers, the right key and the note's name show in green */
+.game-keys .pk-w.reveal { fill: #8fd3a2; animation: reveal-pulse 1s ease-in-out infinite alternate; }
+.game-keys .pk-b.reveal { fill: var(--green); animation: reveal-pulse 1s ease-in-out infinite alternate; }
+@keyframes reveal-pulse { from { opacity: 1; } to { opacity: .65; } }
+.reveal-name { fill: var(--green); font-weight: 900; font-family: var(--font); }
+@media (prefers-reduced-motion: reduce) { .game-keys .reveal { animation: none; } }
+/* touch questions: tap the line, space, staff or clef itself */
+.touch-zone { fill: transparent; cursor: pointer; }
+.touch-zone.ok { fill: rgba(23, 118, 58, .28); }
+.touch-zone.no { fill: rgba(179, 38, 30, .22); }
 

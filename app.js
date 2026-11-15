@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, stories: {}, updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -352,6 +352,8 @@ function renderChallengeSettings(seg) {
     <p class="note">These are for ${esc(N())}'s Challenge only.</p>
     <div class="row-btns"><span>Clefs</span><div class="seg">${['t', 'b', 'a', 'n'].map(c => `<button data-act="cclef" data-v="${c}" aria-pressed="${challengeClefOk(c)}">${CLEF_NAMES[c].replace(' clef', '')}</button>`).join('')}</div></div>
     <p class="note">Tap to switch each clef on or off. Treble and bass to start; alto and tenor are the C clefs, whose middle points at Middle C.</p>
+    <div class="row-btns"><span>Timer</span>${seg('cuntimed', state.challengeUntimed ? 1 : 0, [[0, 'Timed'], [1, 'Untimed']])}</div>
+    <p class="note">${state.challengeUntimed ? `Untimed: the Note Beast walks in and waits in the middle until ${esc(N())} plays the right note, however long that takes. A wrong note still costs a pair of horns. The speed below only sets how fast he walks in and out.` : 'Timed: the Note Beast keeps moving and runs off if the note isn’t played in time.'}</p>
     <div class="row-btns speed-row"><label for="cspeed">Speed</label><span class="small-link">Slower</span><input type="range" id="cspeed" min="1" max="9" step="1" value="${state.challengeSpeed || 5}"><span class="small-link">Faster</span></div>
     <p class="note" id="cspeed-note">${speedNote()}</p>
     <div class="row-btns"><span>Endings</span>${seg('loseend', state.loseEnding === 'theseus' ? 'theseus' : 'sulk', [['sulk', 'Standard'], ['theseus', 'Theseus and the Hydra']])}</div>
@@ -593,6 +595,22 @@ function findCTap(pitch) {
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th', '5th'];
 const plainStaff = (items, o = {}) => staffSvg({ clef: 't', S: o.S || 18, width: o.width || 340, noClef: !o.clef, even: true, lo: stepOf('C4'), hi: stepOf('A5'), items, cl: 'basic' });
 const clefOnly = (c, items = []) => staffSvg({ clef: c, S: 18, width: 300, items, noteX: 220, lo: c === 't' ? stepOf('C4') : stepOf('E2'), hi: c === 't' ? stepOf('A5') : stepOf('C4') });
+// Touch questions: the answer is a place on the staff (a line, a space, a staff, a clef), touched directly.
+function touchQuestion(p, draw, want, prompt, name) {
+  p.touch = { draw, want, marks: {}, name };
+  p.prompt = prompt; p.choices = []; p.vis = null;
+}
+const zoneName = id => id.startsWith('line') ? `the ${ORDINAL[+id.slice(4)]} line` : id.startsWith('space') ? `the ${ORDINAL[+id.slice(5)]} space`
+  : id.startsWith('staff') ? `the ${id.endsWith('t') ? 'treble' : 'bass'} staff` : id.startsWith('clef-') ? `the ${id.endsWith('t') ? 'treble' : 'bass'} clef` : 'the clef';
+function touchAnswer(id) {
+  const p = sess?.probs[sess.i];
+  if (!p?.touch || p.done || p.touch.marks[id]) return;
+  if (id === p.touch.want) { p.touch.marks[id] = 'ok'; gotIt(p); render(); return; }
+  p.touch.marks[id] = 'no';
+  missed(p, `That is ${p.touch.name(id)}.`);
+  if (p.done) p.touch.marks[p.touch.want] = 'ok';
+  render(!p.done);
+}
 function basicProblem(p, it) {
   p.mode = 'choice';
   const kind = it.basic, E4 = stepOf('E4');
@@ -604,12 +622,11 @@ function basicProblem(p, it) {
     p.choices = two(['On a line', line], ['In a space', !line]);
     p.answerText = () => line ? 'A line goes right through its middle: it is on a line.' : 'It sits between two lines: it is in a space.';
   } else if (kind === 'whichLine' || kind === 'whichSpace') {
-    const line = kind === 'whichLine', k = 1 + Math.floor(rng() * (line ? 5 : 4)), s = E4 + (line ? (k - 1) * 2 : k * 2 - 1);
-    p.vis = plainStaff([{ p: pitchOf(s), d: 'w' }]);
-    p.prompt = `Which ${line ? 'line is this note on' : 'space is this note in'}? Count up from the bottom.`;
-    p.layout = 'nums';
-    p.choices = Array.from({ length: line ? 5 : 4 }, (_, i) => ({ t: `${ORDINAL[i + 1]} ${line ? 'line' : 'space'}`, ok: i + 1 === k }));
-    p.answerText = () => `It is ${line ? 'on' : 'in'} the ${ORDINAL[k]} ${line ? 'line' : 'space'}, counting up from the bottom.`;
+    // touched on the staff itself (Katie: touch the actual staff, not a button)
+    const line = kind === 'whichLine', k = 1 + Math.floor(rng() * (line ? 5 : 4)), want = `${line ? 'line' : 'space'}${k}`;
+    touchQuestion(p, o => staffSvg({ clef: 't', S: 30, width: 380, noClef: true, even: true, items: [], touch: 'lines', ...o }), want,
+      `Touch the ${ORDINAL[k]} ${line ? 'line' : 'space'}, counting up from the bottom.`, zoneName);
+    p.answerText = () => `The ${ORDINAL[k]} ${line ? 'line' : 'space'}, counting up from the bottom.`;
   } else if (kind === 'higher' || kind === 'lower') {
     const a = E4 - 1 + Math.floor(rng() * 10);
     let b = a;
@@ -634,16 +651,12 @@ function basicProblem(p, it) {
     p.answerText = () => `One step ${up ? 'up' : 'down'} from ${letterOf(s)} is ${letterOf(t)}.${up && letterOf(s) === 'G' ? ' After G, the letters start again at A.' : !up && letterOf(s) === 'A' ? ' Below A comes G: the letters go round.' : ''}`;
   } else if (kind === 'trebleName' || kind === 'bassName') {
     const c = kind === 'trebleName' ? 't' : 'b';
-    p.vis = clefOnly(c);
-    p.prompt = 'What is this clef called?';
-    p.choices = two(['Treble clef', c === 't'], ['Bass clef', c === 'b']);
-    p.answerText = () => c === 't' ? 'The treble clef, also called the G clef.' : 'The bass clef, also called the F clef.';
+    touchQuestion(p, o => grandSvg({ S: 16, width: 360, touch: 'clef', ...o }), `clef-${c}`, `Touch the ${CLEF[c].name} clef.`, zoneName);
+    p.answerText = () => c === 't' ? 'The treble clef, also called the G clef, is on the top staff.' : 'The bass clef, also called the F clef, is on the bottom staff.';
   } else if (kind === 'trebleLine' || kind === 'bassLine') {
     const c = kind === 'trebleLine' ? 't' : 'b', ans = c === 't' ? 2 : 4;
-    p.vis = clefOnly(c);
-    p.prompt = c === 't' ? 'The treble clef curls around one line. Which line?' : 'The two dots of the bass clef sit on either side of one line. Which line?';
-    p.layout = 'nums';
-    p.choices = [1, 2, 3, 4, 5].map(k => ({ t: `${ORDINAL[k]} line`, ok: k === ans }));
+    touchQuestion(p, o => staffSvg({ clef: c, S: 28, width: 380, items: [], touch: 'lines', ...o }), `line${ans}`,
+      c === 't' ? 'Touch the line the treble clef curls around.' : 'Touch the line between the bass clef’s two dots.', zoneName);
     p.answerText = () => c === 't' ? 'The 2nd line, counting up from the bottom. That line is G.' : 'The 4th line, counting up from the bottom. That line is F.';
   } else if (kind === 'trebleG' || kind === 'bassF') {
     const c = kind === 'trebleG' ? 't' : 'b', note = c === 't' ? 'G4' : 'F3';
@@ -657,19 +670,15 @@ function basicProblem(p, it) {
     const c = rng() < .5 ? 't' : 'b', notes = Array.from({ length: 3 }, () => pitchOf(CLEF[c].bottom + Math.floor(rng() * 9)));
     p.vis = staffSvg({ clef: c, S: 16, width: 340, even: true, items: notes.map(x => ({ p: x, d: 'q' })) });
     if (kind === 'whichClef') {
-      p.prompt = 'What clef is this?';
-      p.choices = two(['Treble clef', c === 't'], ['Bass clef', c === 'b']);
-      p.answerText = () => c === 't' ? 'A treble clef: it curls around the G line.' : 'A bass clef: its two dots sit around the F line.';
+      touchQuestion(p, o => grandSvg({ S: 16, width: 360, touch: 'clef', t: c === 't' ? notes.map(x => ({ p: x, d: 'q' })) : [], b: c === 'b' ? notes.map(x => ({ p: x, d: 'q' })) : [], ...o }), `clef-${c}`, `Touch the ${CLEF[c].name} clef.`, zoneName);
+      p.answerText = () => c === 't' ? 'The treble clef curls around the G line.' : 'The bass clef’s two dots sit around the F line.';
     } else {
-      p.prompt = 'Which hand usually plays the notes on this staff?';
-      p.choices = two(['Right hand', c === 't'], ['Left hand', c === 'b']);
-      p.answerText = () => c === 't' ? 'This is a treble staff, usually played with the right hand.' : 'This is a bass staff, usually played with the left hand.';
+      touchQuestion(p, o => grandSvg({ S: 16, width: 360, touch: 'staff', ...o }), `staff-${c}`, `Touch the staff the ${c === 't' ? 'right' : 'left'} hand usually plays.`, zoneName);
+      p.answerText = () => c === 't' ? 'The treble staff, on top, is usually for the right hand.' : 'The bass staff, below, is usually for the left hand.';
     }
   } else if (kind === 'grandTop') {
     const treble = rng() < .5;
-    p.vis = grandSvg({ S: 13, width: 340 });
-    p.prompt = `On the grand staff, which one is the ${treble ? 'treble' : 'bass'} staff?`;
-    p.choices = two(['The top staff', treble], ['The bottom staff', !treble]);
+    touchQuestion(p, o => grandSvg({ S: 16, width: 360, touch: 'staff', ...o }), `staff-${treble ? 't' : 'b'}`, `Touch the ${treble ? 'treble' : 'bass'} staff.`, zoneName);
     p.answerText = () => 'The treble staff is on top and the bass staff is below.';
   } else if (kind === 'grandWhich') {
     const c = rng() < .5 ? 't' : 'b', note = pitchOf(CLEF[c].bottom + Math.floor(rng() * 9)), it2 = [{ p: note, d: 'w', cls: 'now' }];
@@ -1179,7 +1188,10 @@ function buildSession() {
     if (card) q.card = card;
     qs.push(q);
   };
-  for (const c of dueCards().filter(c => !held.has(c.topic)).slice(0, Math.ceil(n * .3))) take(c.topic, c.level, 'again', findItem(c.topic, c.wid), c.box === 0 ? c.seed : newSeed(), c.id);
+  // Missed questions coming back (a grown-up setting): from any topic, only from the topics picked for this round, or not at all.
+  const review = state.reviewMissed || 'all';
+  const comesBack = c => !held.has(c.topic) && (review === 'all' || (review === 'selected' && on.includes(c.topic)));
+  for (const c of (review === 'off' ? [] : dueCards().filter(comesBack)).slice(0, Math.ceil(n * .3))) take(c.topic, c.level, 'again', findItem(c.topic, c.wid), c.box === 0 ? c.seed : newSeed(), c.id);
   // The path from Middle C is the point right now, so it gets a double turn in the rotation when on.
   const rotation = shuffle(on.flatMap(k => k === 'path' && on.length > 1 ? [k, k] : [k]));
   for (let i = 0; qs.length < n && i < n * 8; i++) {
@@ -1530,7 +1542,7 @@ function renderHome() {
     <button class="start" data-act="stories">Open</button>
   </section>
   <section class="challenge-card">
-    <div><h2>Note Beast Challenge</h2><p class="note">Note Beast runs past with a note on his sign. Play it before he runs off! Catch ${CHALLENGE_GOAL} to win. Level ${challengeLevel()}${state.challenge?.wins ? `, after ${state.challenge.wins} win${state.challenge.wins > 1 ? 's' : ''}` : ''}.</p></div>
+    <div><h2>Note Beast Challenge</h2><p class="note">${state.challengeUntimed ? 'Note Beast walks in with a note on his sign and waits. Play it to catch him!' : 'Note Beast runs past with a note on his sign. Play it before he runs off!'} Catch ${CHALLENGE_GOAL} to win. Level ${challengeLevel()}${state.challenge?.wins ? `, after ${state.challenge.wins} win${state.challenge.wins > 1 ? 's' : ''}` : ''}.</p></div>
     <button class="start" data-act="challenge">Play</button>
   </section>
   <section>
@@ -1748,6 +1760,7 @@ function renderPlay() {
   } else {
     let vis = '';
     if (isNoteStaff || p.item.twin) vis = `<div class="staff-wrap">${noteStaff(p, p.item.twin ? 18 : 24)}</div>`;
+    else if (p.touch) vis = `<div class="staff-wrap touch-wrap">${p.touch.draw({ touchMarks: p.touch.marks })}</div>`;
     else if (p.vis) vis = `<div class="staff-wrap">${p.vis}</div>`;
     else if (p.hl != null) vis = pianoSvg({ from: p.from, whites: p.whites, marks: { [p.hl]: 'hl' }, letters: false, star: false });
     else if (p.keyStrip) vis = pianoSvg(p.keyStrip);
@@ -1850,6 +1863,8 @@ function renderParent() {
   <section>
     <h2>Coming back for review</h2>
     <p class="note">A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being right. ${state.cleared ? `${state.cleared} learned for good so far.` : ''}</p>
+    <div class="row-btns"><span>Missed questions come back</span>${seg('reviewmissed', state.reviewMissed || 'all', [['all', 'From any topic'], ['selected', 'Only selected topics'], ['off', 'Off']]).replace('class="seg"', 'class="seg seg-wrap"')}</div>
+    <p class="note">From any topic: missed questions come back in every round, whatever topics are picked on the home screen. Only selected topics: a round asks only about the topics picked. Off: missed questions don’t come back in rounds for now; they wait here until this is turned back on.</p>
     ${cards.length ? `<ul class="list">${cards.slice(0, 12).map(c => `<li><span>${esc(anyItem(c.wid) ? itemLabel(anyItem(c.wid)) : c.wid)}</span><span>${when(c.due)} · step ${c.box + 1} of ${REVIEW_DAYS.length}</span></li>`).join('')}</ul>` : '<p class="note">Nothing to review yet.</p>'}
   </section>
   <section>
@@ -2001,6 +2016,8 @@ const ACTIONS = {
   cclef(d) { const on = challengeClefs(), next = on.includes(d.v) ? on.filter(c => c !== d.v) : [...on, d.v]; if (next.length) { state.challengeClefs = next; save(); } render(); },
   cclefs(d) { state.cClefs = d.v === '1'; save(); render(); },
   loseend(d) { state.loseEnding = d.v; save(); render(); },
+  reviewmissed(d) { state.reviewMissed = d.v; save(); render(); },
+  cuntimed(d) { state.challengeUntimed = d.v === '1'; save(); render(); },
   // switching to Choose starts from the notes Automatic would ask now, so nothing changes until a note is tapped
   cmode(d) { state.challengeNotes = d.v === '1' ? autoChallengePool().map(([c, p]) => `${c}:${p}`) : null; save(); render(); },
   cnote(d) { const set = new Set(state.challengeNotes || []); set.has(d.n) ? set.delete(d.n) : set.add(d.n); state.challengeNotes = [...set]; save(); render(); },
@@ -2023,7 +2040,7 @@ const ACTIONS = {
   'creset-no'() { confirmChallengeReset = false; render(); },
   'creset-yes'() { state.challenge = { wins: 0, plays: 0 }; confirmChallengeReset = false; save(); render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed, challengeUntimed: state.challengeUntimed, reviewMissed: state.reviewMissed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },
@@ -2038,6 +2055,8 @@ app.addEventListener('click', e => {
     if (screen === 'play' && key.closest('.key-wrap.live')) tapKey(+key.dataset.midi);
     return;
   }
+  const zone = e.target.closest?.('[data-touch]');
+  if (zone && screen === 'play') { audioReady(); touchAnswer(zone.dataset.touch); return; }
   const b = e.target.closest?.('[data-act]');
   // a note on a staff plays when tapped, unless the whole staff is itself an answer button
   const note = !b && e.target.closest?.('[data-play]');

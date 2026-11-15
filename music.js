@@ -165,17 +165,29 @@ function staffSvg(o) {
       out += tapNote(a.svg, it, at, Y(si), S) + tapNote(b.svg, items[j], placed[j], Y(sj), S) + `<rect class="n-head" x="${Math.min(a.stem.x, b.stem.x) - S * .07}" y="${up ? end : end - S * .45}" width="${Math.abs(b.stem.x - a.stem.x) + S * .14}" height="${S * .45}"/>`;
     } else if (!pairs.has(i)) out += tapNote(drawNote(c, at, stepOf(it.p), it.d, S, Y, { cls: it.cls, acc: it.acc, noStem: it.noStem }).svg, it, at, Y(stepOf(it.p)), S);
   });
-  // the walk: letters climbing from the landmark to the note; hint mode hides the last one
+  // the walk: notes climbing from the landmark to the note, each with its letter just above it; hint mode hides the last one.
+  // Every letter sits on a real notehead (Katie: floating letters confused beginners).
   if (o.walk) {
     const { steps, hide } = o.walk, tx = placed[0], gap = Math.min(S * 1.9, (tx - clefW - S * .6) / Math.max(1, steps.length - 1));
     steps.slice(0, -1).forEach((s, i) => {
       const lx = tx - (steps.length - 1 - i) * gap;
-      out += `<text class="walk ${i === 0 ? 'mark' : ''}" x="${lx}" y="${Y(s) + S * .42}" font-size="${S * 1.15}">${letterOf(s)}</text>`;
+      out += drawNote(c, lx, s, 'w', S, Y, { cls: `walk-head ${i === 0 ? 'mark' : ''}` }).svg;
+      out += `<text class="walk ${i === 0 ? 'mark' : ''}" x="${lx}" y="${Y(s) - S * .75}" font-size="${S * 1.05}">${letterOf(s)}</text>`;
     });
     if (hide) out += `<text class="walk q" x="${tx + S * 1.5}" y="${Y(steps[steps.length - 1]) + S * .42}" font-size="${S * 1.2}">?</text>`;
     else out += `<text class="walk final" x="${tx + S * 1.5}" y="${Y(steps[steps.length - 1]) + S * .42}" font-size="${S * 1.2}">${letterOf(steps[steps.length - 1])}</text>`;
   }
   if (o.extra) out += o.extra({ Y, S, x: placed, w, yTop, staffH });
+  // touch questions: invisible zones over each line and space (numbered from the bottom) and the clef, to be tapped as the answer
+  if (o.touch) {
+    const mk = id => o.touchMarks?.[id] || '', zone = (id, x, y, zw, zh) => `<rect class="touch-zone ${mk(id)}" data-touch="${id}" x="${x}" y="${y}" width="${zw}" height="${zh}" rx="4"/>`;
+    const x0 = clefW + S * .3;
+    if (o.touch.includes('lines')) {
+      for (let k = 1; k <= 4; k++) out += zone(`space${k}`, x0, yTop + (4 - k) * S + S * .25, w - x0 - 4, S * .5);
+      for (let k = 1; k <= 5; k++) out += zone(`line${k}`, x0, yTop + (5 - k) * S - S * .25, w - x0 - 4, S * .5);
+    }
+    if (o.touch.includes('clef')) out += zone('clef', 2, yTop - S * 1.2, clefW - 2, staffH + S * 2.4);
+  }
   if (o.parts) return { inner: out, h: Math.ceil(h), yTop, staffH, w };
   const live = o.live ? ` data-live="1" data-c="${c}" data-lo="${o.lo}" data-hi="${o.hi}" data-ytop="${yTop}" data-s="${S}"` : '';
   return `<svg class="staff ${o.cl || ''}" viewBox="0 0 ${w} ${Math.ceil(h)}"${live} role="img" aria-label="${o.label || 'Music staff'}">${out}${o.live ? `<g id="placed">${o.placed || ''}</g><rect class="live-hit" x="0" y="0" width="${w}" height="${Math.ceil(h)}"/>` : ''}</svg>`;
@@ -187,7 +199,14 @@ function grandSvg(o) {
   const low = staffSvg({ clef: 'b', S, width: w - L, even: o.even, items: o.b || [], hi: Math.max(stepOf('C4'), ...(o.b || []).filter(i => i.p).map(i => stepOf(i.p))), parts: true });
   const y0 = top.yTop, y1 = top.h + low.yTop + low.staffH, [bx0, by0, bx1, by1] = GLYPHS.brace.b, ky = (y1 - y0) / (by1 - by0), kx = Math.min(ky, S * 1.25 / (bx1 - bx0));
   const brace = `<path class="gl" transform="translate(${(L - (bx1 - bx0) * kx) / 2 - bx0 * kx} ${y1}) scale(${kx.toFixed(4)} ${(-ky).toFixed(4)})" d="${GLYPHS.brace.d}"/>`;
-  return `<svg class="staff grand ${o.cl || ''}" viewBox="0 0 ${w} ${top.h + low.h}" role="img" aria-label="Grand staff: treble staff on top, bass staff below">${brace}<line class="st-bar" x1="${L + 4}" x2="${L + 4}" y1="${y0}" y2="${y1}"/><g transform="translate(${L} 0)">${top.inner}</g><g transform="translate(${L} ${top.h})">${low.inner}</g></svg>`;
+  // touch questions: the whole of each staff, or just each clef, can be tapped as the answer
+  let zones = '';
+  if (o.touch) {
+    const mk = id => o.touchMarks?.[id] || '', zone = (id, x, y, zw, zh) => `<rect class="touch-zone ${mk(id)}" data-touch="${id}" x="${x}" y="${y}" width="${zw}" height="${zh}" rx="6"/>`;
+    if (o.touch.includes('staff')) zones += zone('staff-t', L, top.yTop - S * 1.3, w - L - 2, top.staffH + S * 2.6) + zone('staff-b', L, top.h + low.yTop - S * 1.3, w - L - 2, low.staffH + S * 2.6);
+    if (o.touch.includes('clef')) zones += zone('clef-t', L + 4, top.yTop - S * 1.4, S * 3.6, top.staffH + S * 2.8) + zone('clef-b', L + 4, top.h + low.yTop - S * .6, S * 3.6, low.staffH + S * 1.2);
+  }
+  return `<svg class="staff grand ${o.cl || ''}" viewBox="0 0 ${w} ${top.h + low.h}" role="img" aria-label="Grand staff: treble staff on top, bass staff below">${brace}<line class="st-bar" x1="${L + 4}" x2="${L + 4}" y1="${y0}" y2="${y1}"/><g transform="translate(${L} 0)">${top.inner}</g><g transform="translate(${L} ${top.h})">${low.inner}</g>${zones}</svg>`;
 }
 // The note being placed on a live staff (the head only, with its ledger lines).
 function placedNote(c, s, x, S, yTop, cls = 'placing') {

@@ -136,7 +136,7 @@ function theseusSvg() {
   // limbs drawn like the Note Beast's: a dark outline stroke with a fill stroke on top
   const limb = (d, w, fill) => `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${w + 7}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${fill}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
   const leg = x => `${limb(`M${x} 262 L${x} 370`, 26, skin)}<path d="M${x - 15} 316 Q${x} 310 ${x + 15} 316 L${x + 14} 366 L${x - 14} 366 Z" fill="${bronze}" stroke="${ink}" stroke-width="3"/><rect x="${x - 18}" y="368" width="38" height="14" rx="6" fill="${leather}" stroke="${ink}" stroke-width="3"/>`;
-  return `<svg class="theseus" viewBox="0 0 260 392" role="img" aria-label="Theseus, the hero, with sword and shield">
+  return `<svg class="theseus" viewBox="0 0 260 392" role="img" aria-label="Theseus, the hero, with sword and a shield showing an owl, the symbol of Athens">
   <g stroke="${ink}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
     <path d="M78 150 C52 210 44 290 60 352 L112 340 L118 160 Z" fill="${red}"/>
     <path d="M70 230 C64 270 64 310 70 344" fill="none" stroke="${redDk}" stroke-width="3"/>
@@ -148,16 +148,15 @@ function theseusSvg() {
     <path d="M106 176 Q120 188 134 178 Q148 188 162 176" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
     <path d="M134 182 V230 M112 206 Q134 214 156 206" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
     <rect x="96" y="226" width="76" height="12" rx="3" fill="${leather}"/>
-    <rect x="122" y="118" width="24" height="26" fill="${skin}"/>
-    <path d="M134 16 C150 14 164 24 170 40" fill="none"/>
-    <path d="M96 58 C96 22 172 22 172 58 L172 110 C172 118 166 122 158 120 L152 92 L146 92 L146 124 L122 124 L122 92 L116 92 L110 120 C102 122 96 118 96 110 Z" fill="${bronze}"/>
-    <path d="M122 92 L146 92 L146 124 L122 124 Z" fill="${skin}"/>
-    <path d="M110 74 L158 74 L158 92 L110 92 Z" fill="${ink}"/>
-    <circle cx="122" cy="83" r="5" fill="#fff" stroke="none"/><circle cx="146" cy="83" r="5" fill="#fff" stroke="none"/>
-    <circle cx="123" cy="84" r="2.6" fill="${ink}" stroke="none"/><circle cx="147" cy="84" r="2.6" fill="${ink}" stroke="none"/>
-    <path d="M130 74 L138 74 L137 104 L131 104 Z" fill="${bronze}" stroke-width="2.5"/>
-    <path d="M126 114 Q134 119 142 114" fill="none" stroke-width="3"/>
-    <path d="M100 64 Q134 52 168 64" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
+    <rect x="112" y="118" width="44" height="30" rx="6" fill="${skin}"/>
+    <path d="M100 88 L168 88 L170 122 C164 140 104 140 98 122 Z" fill="${skin}"/>
+    <path d="M84 62 C84 16 184 16 184 62 L184 114 C184 126 174 130 164 126 L160 98 L108 98 L104 126 C94 130 84 126 84 114 Z" fill="${bronze}"/>
+    <path d="M100 72 L168 72 L168 96 L100 96 Z" fill="${ink}"/>
+    <circle cx="119" cy="84" r="6" fill="#fff" stroke="none"/><circle cx="149" cy="84" r="6" fill="#fff" stroke="none"/>
+    <circle cx="120" cy="85" r="3" fill="${ink}" stroke="none"/><circle cx="150" cy="85" r="3" fill="${ink}" stroke="none"/>
+    <path d="M130 72 L138 72 L137 110 L131 110 Z" fill="${bronze}" stroke-width="2.5"/>
+    <path d="M122 120 Q134 128 146 120" fill="none" stroke-width="3"/>
+    <path d="M92 64 Q134 48 176 64" fill="none" stroke="${bronzeDk}" stroke-width="3"/>
     <path d="M128 36 C110 -8 162 -10 176 16 C186 34 184 52 176 62 C172 40 160 28 140 30 Z" fill="${red}"/>
     <path d="M136 30 C138 12 152 4 166 10 M146 30 C150 18 162 14 172 22 M154 32 C160 26 170 26 176 36" fill="none" stroke="${redDk}" stroke-width="3"/>
     <rect x="124" y="30" width="20" height="10" rx="2" fill="${bronzeDk}"/>
@@ -178,7 +177,17 @@ function theseusSvg() {
     <circle cx="70" cy="222" r="50" fill="${red}" stroke-width="3"/>
     <circle cx="70" cy="222" r="38" fill="${bronze}" stroke-width="3"/>
     ${Array.from({ length: 12 }, (_, i) => { const t = i * Math.PI / 6; return `<circle cx="${(70 + 56 * Math.cos(t)).toFixed(1)}" cy="${(222 + 56 * Math.sin(t)).toFixed(1)}" r="2.6" fill="${bronzeDk}" stroke="none"/>`; }).join('')}
-    <path d="M70 196 L76 214 L95 214 L80 225 L86 244 L70 233 L54 244 L60 225 L45 214 L64 214 Z" fill="${red}" stroke-width="2.5"/>
+    <g class="owl" stroke-width="2.5">
+      <path d="M58 199 L54 186 L65 196 Z M82 199 L86 186 L75 196 Z" fill="#3b2a1d"/>
+      <ellipse cx="70" cy="232" rx="19" ry="21" fill="#3b2a1d"/>
+      <circle cx="70" cy="209" r="15" fill="#3b2a1d"/>
+      <path d="M57 226 Q60 244 70 251 M83 226 Q80 244 70 251" fill="none" stroke="#7a5a3a"/>
+      <path d="M64 230 l3 4 3 -4 3 4 3 -4 M64 238 l3 4 3 -4 3 4 3 -4" fill="none" stroke="${bronzeDk}" stroke-width="2"/>
+      <circle cx="64" cy="207" r="6" fill="#fff"/><circle cx="76" cy="207" r="6" fill="#fff"/>
+      <circle cx="64" cy="207" r="2.8" fill="${ink}" stroke="none"/><circle cx="76" cy="207" r="2.8" fill="${ink}" stroke="none"/>
+      <path d="M70 212 L67 217 L73 217 Z" fill="${bronze}" stroke-width="1.8"/>
+      <path d="M63 253 v5 M67 253 v5 M73 253 v5 M77 253 v5" stroke="${ink}" stroke-width="2"/>
+    </g>
   </g>
 </svg>`;
 }

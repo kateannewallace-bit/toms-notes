@@ -64,6 +64,16 @@ function nextPlacard() {
   while (game.pool.length > 1 && game.last && next[0] === game.last[0] && next[1] === game.last[1]);
   game.target = next; game.last = next;
   game.phase = 'in'; game.x = -.4; game.missed = false; game.mood = 'happy'; game.pose = 'hold';
+  game.wrongs = 0; game.reveal = false; showReveal();
+}
+// After two wrong answers on the same note, the right key lights up green and the note's name appears in green on his sign.
+function noteWrong() {
+  game.wrongs = (game.wrongs || 0) + 1;
+  if (game.wrongs >= 2 && !game.reveal) { game.reveal = true; showReveal(); }
+}
+function showReveal() {
+  document.querySelectorAll('.game-keys .reveal').forEach(k => k.classList.remove('reveal'));
+  if (game?.reveal) document.querySelector(`.game-keys [data-midi="${midiOf(game.target[1])}"]`)?.classList.add('reveal');
 }
 // A pass takes about nine seconds at level 1, from when he appears to when he's gone. Each Challenge won makes
 // the next level a little quicker: about six seconds by level 7, and never quicker than about four.
@@ -84,7 +94,8 @@ function challengeFrame(now) {
   placeBeast(t);
   if (t >= 1) {
     if (game.phase === 'in') setPhase('wait');
-    else if (game.phase === 'wait') { game.from = game.x; setPhase('out'); }
+    // untimed (a grown-up setting): he waits in the middle until the right note, however long it takes
+    else if (game.phase === 'wait') { if (!state.challengeUntimed) { game.from = game.x; setPhase('out'); } }
     // after shaking the sign, he stays put and gives another try at the same note
     else if (game.phase === 'scowl') { game.missed = false; game.mood = 'happy'; setPhase('wait'); }
     else if (game.phase === 'out' || game.phase === 'flee') {
@@ -155,7 +166,8 @@ function drawBeast() {
   const el = document.getElementById('runner');
   if (!el) return;
   const [clef, p] = game.target;
-  const placard = ['sit', 'cheer'].includes(game.pose) ? '' : staffSvg({ clef, S: 12, width: 168, tight: true, items: [{ p, d: 'w' }], noteX: 118 });
+  const placard = ['sit', 'cheer'].includes(game.pose) ? '' : staffSvg({ clef, S: 12, width: 168, tight: true, items: [{ p, d: 'w' }], noteX: 118,
+    extra: game.reveal ? ({ x, Y, S }) => `<text class="reveal-name" x="${x[0] + S * 2.1}" y="${Y(stepOf(p)) + S * .55}" font-size="${S * 1.9}">${letterOf(stepOf(p))}</text>` : null });
   el.innerHTML = beastFigure(game.mood, game.pose, placard, { laurel: game.laurel, stabbed: game.fell });
   placeBeast(0);
 }
@@ -220,6 +232,7 @@ function challengeKey(midi) {
     return;
   }
   // wrong as he's leaving: a pair of horns, and he keeps going; the same note comes back on his next lap
+  noteWrong();
   if (leaving) {
     game.missed = true; game.mood = 'scowl'; drawBeast();
     grunt('sad', hearing() ? 0 : .7);
