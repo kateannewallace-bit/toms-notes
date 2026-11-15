@@ -232,8 +232,18 @@ const liveStepAt = (svg, clientY) => {
 
 /* ---------- the piano ---------- */
 // from: a white-key step; whites: how many white keys show. marks: { midi: class }; star shows Middle C; letters: 'c' labels every C, 'all' labels every white key.
+// Katie: never cut a group of black keys in half. A keyboard may only start or end on C, E, F or B, where nothing of a group
+// is lost, so the twos and threes always show whole. Any other edge is widened by a key or two to the nearest clean one.
+const CLEAN_EDGE = 'CEFB';
+function wholeGroups(from, whites) {
+  let a = from, z = from + whites - 1;
+  while (!CLEAN_EDGE.includes(letterOf(a))) a--;
+  while (!CLEAN_EDGE.includes(letterOf(z))) z++;
+  return { from: a, whites: z - a + 1 };
+}
 function pianoSvg(o) {
-  const whites = o.whites || 11, W = 36, H = 158, BW = 22, BH = 98, marks = o.marks || {};
+  const g = wholeGroups(o.from, o.whites || 11), W = 36, H = 158, BW = 22, BH = 98, marks = o.marks || {};
+  o = { ...o, from: g.from }; const whites = g.whites;
   let w = '', b = '';
   for (let i = 0; i < whites; i++) {
     const s = o.from + i, m = whiteMidi(s), x = i * W + 1, letter = letterOf(s);

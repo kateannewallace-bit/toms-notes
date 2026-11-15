@@ -1688,7 +1688,7 @@ function pianoFor(p) {
 // When Middle C is off this stretch of keys, say which way it is.
 function pianoHint(p) {
   if (p.pianoOpts?.star === false || !p.clef) return '';
-  const lo = whiteMidi(p.from), hi = whiteMidi(p.from + p.whites - 1);
+  const g = wholeGroups(p.from, p.whites), lo = whiteMidi(g.from), hi = whiteMidi(g.from + g.whites - 1);
   if (MIDDLE_C < lo) return '<p class="note center">← Middle C is off to the left</p>';
   if (MIDDLE_C > hi) return '<p class="note center">Middle C is off to the right →</p>';
   return '';

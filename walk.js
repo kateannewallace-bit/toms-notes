@@ -236,7 +236,8 @@ const WALK_KEY_PX = 46;
 // next stretch of notes, somewhere random around them. When it moves, a little glissando plays and the keys flash.
 function walkWindow(width) {
   const w = walk, [LO, HI] = walkRange();
-  const fit = Math.max(8, Math.min(WALK_HI - WALK_LO + 1, Math.floor(width / WALK_KEY_PX)));
+  // two keys spare, since the keyboard widens to whole black-key groups (see wholeGroups)
+  const fit = Math.max(8, Math.min(WALK_HI - WALK_LO + 1, Math.floor(width / WALK_KEY_PX) - 2));
   if (HI - LO + 1 <= fit) {
     let from = LO - Math.floor((fit - (HI - LO + 1)) / 2);
     from = Math.max(WALK_LO, Math.min(from, WALK_HI - fit + 1));
@@ -257,6 +258,7 @@ function walkPiano(box) {
   if (!w.win || w.i >= w.win.until || !onKeys(w.win)) {
     const first = !w.win;
     w.win = walkWindow(box.clientWidth || 720);
+    w.win = { ...wholeGroups(w.win.from, w.win.whites), until: w.win.until };
     if (!first) { w.moved = true; if (!hearing()) keysMovedSound(w.win); }
   }
   const marks = {};
