@@ -1,4 +1,4 @@
-/* Walking Up and Down (Katie's spec, 2026-11-14): a long line of notes moving up or down by step, over the whole range from
+/* Walking Up and Down (Katie's spec, 2026-11-14; a grown-up can also make the notes jump around, state.walkMode = 'jump'): a long line of notes moving up or down by step, over the whole range from
    the C above the treble staff (C6) to the C below the bass staff (C2), on the grand staff. Fifty notes a round; name each one.
    A wrong letter gets two more tries, then the right one is shown. Answered letters stay under the staff for reference.
    Above it, Note Beast rows a boat from Crete to Athens; the sea and the sights go by as the round goes on, Athens comes into
@@ -6,25 +6,39 @@
 
 const WALK_LEN = 50, WALK_LO = stepOf('C2'), WALK_HI = stepOf('C6'), WALK_TRIES = 3, WALK_SHOW = 13;
 const WORLD_W = 4000, VIEW_W = 1000;
+// The range to walk, set on the grown-ups page (state.walkLo / state.walkHi); the whole range from C2 to C6 unless narrowed.
+const walkRange = () => {
+  const lo = stepOf(state.walkLo || 'C2'), hi = stepOf(state.walkHi || 'C6');
+  return lo < hi ? [Math.max(WALK_LO, lo), Math.min(WALK_HI, hi)] : [WALK_LO, WALK_HI];
+};
 let walk = null;  // { steps, clefs, i, tries, results, wrong, msg, phase }
 
 // A walk that reaches both ends of the range: one way to the top C (or bottom C), the other way all the way across,
 // then back toward the middle; a few short turns along the way so it isn't just a scale.
 function makeWalk() {
-  const up = Math.random() < .5, targets = up ? [WALK_HI, WALK_LO, stepOf('C4')] : [WALK_LO, WALK_HI, stepOf('C4')];
-  const steps = [stepOf('C4')];
+  const [LO, HI] = walkRange(), mid = Math.min(HI, Math.max(LO, stepOf('C4')));
+  // a grown-up setting: notes that jump around anywhere in the range instead of stepping (never the same note twice in a row)
+  if (state.walkMode === 'jump') {
+    const steps = [];
+    while (steps.length < WALK_LEN) { let s; do s = LO + Math.floor(Math.random() * (HI - LO + 1)); while (HI > LO && s === steps.at(-1)); steps.push(s); }
+    const clefs = steps.map((s, i) => s > stepOf('C4') ? 't' : s < stepOf('C4') ? 'b' : Math.random() < .5 ? 't' : 'b');
+    return { steps, clefs };
+  }
+  const up = Math.random() < .5, targets = up ? [HI, LO, mid] : [LO, HI, mid];
+  const steps = [mid];
   let turns = 3;
   for (const t of targets) {
     while (steps.length < WALK_LEN && steps.at(-1) !== t) {
       const dir = Math.sign(t - steps.at(-1)), at = steps.at(-1);
+      // a narrow range keeps sweeping back and forth until there are fifty notes
       // now and then step back once, then carry on (never past the ends, never wasting steps the round needs)
       const room = WALK_LEN - steps.length - Math.abs(t - at) - (t === targets[2] ? 0 : Math.abs(targets[2] - t));
-      if (turns > 0 && room > 4 && Math.random() < .12 && at - dir >= WALK_LO && at - dir <= WALK_HI && steps.length > 2) {
+      if (turns > 0 && room > 4 && Math.random() < .12 && at - dir >= LO && at - dir <= HI && steps.length > 2) {
         steps.push(at - dir, at); turns--;
       } else steps.push(at + dir);
     }
   }
-  while (steps.length < WALK_LEN) { const at = steps.at(-1); steps.push(at + (at >= WALK_HI ? -1 : at <= WALK_LO ? 1 : Math.random() < .5 ? 1 : -1)); }
+  while (steps.length < WALK_LEN) { const at = steps.at(-1); steps.push(at + (at >= HI ? -1 : at <= LO ? 1 : Math.random() < .5 ? 1 : -1)); }
   steps.length = WALK_LEN;
   // Middle C goes on whichever staff the line is already on; everything else on its own staff
   const clefs = [];
@@ -168,7 +182,7 @@ function rowStroke() {
 /* ---------- screens ---------- */
 function renderWalk() {
   const w = walk;
-  const head = `<header class="top"><h1>Walking Up and Down</h1><button class="ghost" data-act="home">Home</button></header>`;
+  const head = `<header class="top"><h1>Note Beast On The High Seas</h1><button class="ghost" data-act="home">Home</button></header>`;
   if (w.phase === 'done') {
     const first = w.results.filter(r => r === 'ok').length, best = state.walks?.best ?? first;
     return `${head}<div class="walk-done"><div class="scene-wrap">${sceneSvg()}</div>
@@ -201,7 +215,7 @@ function walkLetter(L) {
   w.tries++; w.wrong.push(L);
   if (!hearing()) grunt('sad');  // an unhappy sound for a wrong answer
   if (w.tries >= WALK_TRIES) return walkNext('shown', `It is ${right}.`);
-  w.msg = `Not ${L}. ${w.tries === 1 ? 'Two more tries.' : 'One more try.'} ${w.i ? `The note before was ${letterOf(w.steps[w.i - 1])}; this one is a step ${s > w.steps[w.i - 1] ? 'up' : 'down'}.` : ''}`;
+  w.msg = `Not ${L}. ${w.tries === 1 ? 'Two more tries.' : 'One more try.'} ${state.walkMode === 'jump' ? hintWords(w.clefs[w.i], s) : w.i ? `The note before was ${letterOf(w.steps[w.i - 1])}; this one is a step ${s > w.steps[w.i - 1] ? 'up' : 'down'}.` : ''}`;
   w.msgCls = 'how try-line';
   drawWalk();
   document.getElementById('walk-staff')?.classList.add('shake');

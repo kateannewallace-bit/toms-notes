@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, walkLo: 'C2', walkHi: 'C6', walkMode: 'steps', updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -338,6 +338,24 @@ function drawSpeakBar() {
   if (screen !== 'play' || !speakMode() || !sess || !speechWanted(sess.probs[sess.i])) return;
   const anchor = document.getElementById('problem');
   anchor?.insertAdjacentHTML('afterend', `<div id="speak-bar">${speakBarHtml()}</div>`);
+}
+
+/* ---------- Walking Up and Down settings: the lowest and highest note of the walk ---------- */
+const WALK_NAMES = { C6: 'the C above the treble staff', A5: 'first ledger line above the treble staff', G4: 'treble G', C5: 'treble C, 3rd space', C4: 'Middle C', F3: 'bass F', C3: 'bass C, 2nd space', E2: 'first ledger line below the bass staff', C2: 'the C below the bass staff' };
+function renderWalkSettings() {
+  const all = []; for (let s = stepOf('C6'); s >= stepOf('C2'); s--) all.push(pitchOf(s));
+  const opt = (p, cur) => `<option value="${p}" ${p === cur ? 'selected' : ''}>${p}${WALK_NAMES[p] ? ` (${WALK_NAMES[p]})` : ''}</option>`;
+  const lo = state.walkLo || 'C2', hi = state.walkHi || 'C6', count = stepOf(hi) - stepOf(lo) + 1;
+  return `<section>
+    <h2>Note Beast On The High Seas</h2>
+    <div class="row-btns"><span>Notes move</span><div class="seg">${[['steps', 'Up and down by steps'], ['jump', 'Jump around']].map(([v, t]) => `<button data-act="walkmode" data-v="${v}" aria-pressed="${(state.walkMode || 'steps') === v}">${t}</button>`).join('')}</div></div>
+    <p class="note">${state.walkMode === 'jump' ? 'Jump around: each note can be anywhere in the range, never the same note twice in a row.' : 'Up and down by steps: each note is one step up or down from the one before.'}</p>
+    <p class="note">The highest and lowest notes the walk goes to. Narrow it to practice fewer notes; a round is still ${50} notes, ${state.walkMode === 'jump' ? 'all inside the range' : 'going back and forth inside the range'}.</p>
+    <div class="row-btns"><label for="walk-hi">Highest note</label><select id="walk-hi" class="pick">${all.map(p => opt(p, hi)).join('')}</select></div>
+    <div class="row-btns"><label for="walk-lo">Lowest note</label><select id="walk-lo" class="pick">${all.map(p => opt(p, lo)).join('')}</select></div>
+    <p class="note" id="walk-range-note">${count} notes, from ${lo} up to ${hi}.</p>
+    <div class="row-btns"><button class="link" data-act="walk-full">Use the whole range (C2 to C6)</button></div>
+  </section>`;
 }
 
 /* ---------- Note Beast Challenge settings (grown-ups page) ---------- */
@@ -1538,7 +1556,7 @@ function renderHome() {
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section class="challenge-card">
-    <div><h2>Walking Up and Down</h2><p class="note">Name 50 notes stepping up and down, from the C above the treble staff to the C below the bass staff, while Note Beast rows from Crete to Athens.${state.walks?.plays ? ` Best: ${state.walks.best} of 50 on the first try.` : ''}</p></div>
+    <div><h2>Note Beast On The High Seas</h2><p class="note">Name 50 notes ${state.walkMode === 'jump' ? 'jumping around' : 'stepping up and down'}, ${(state.walkLo || 'C2') === 'C2' && (state.walkHi || 'C6') === 'C6' ? 'from the C above the treble staff to the C below the bass staff' : `between ${state.walkLo} and ${state.walkHi}`}, while Note Beast rows from Crete to Athens.${state.walks?.plays ? ` Best: ${state.walks.best} of 50 on the first try.` : ''}</p></div>
     <button class="start" data-act="walk">Row</button>
   </section>
   <section class="challenge-card">
@@ -1864,6 +1882,7 @@ function renderParent() {
     <p class="note">Show: the Note Map and Note Stories add the alto clef (read by violas) and the tenor clef (read by cellos, bassoons and trombones for high notes). They can also be switched on for the Challenge below.</p>
   </section>
   ${renderChallengeSettings(seg)}
+  ${renderWalkSettings()}
   <section>
     <h2>Coming back for review</h2>
     <p class="note">A missed note comes back tomorrow, then after 3, 7, 14 and 30 days while it keeps being right. ${state.cleared ? `${state.cleared} learned for good so far.` : ''}</p>
@@ -2021,6 +2040,8 @@ const ACTIONS = {
   cclef(d) { const on = challengeClefs(), next = on.includes(d.v) ? on.filter(c => c !== d.v) : [...on, d.v]; if (next.length) { state.challengeClefs = next; save(); } render(); },
   cclefs(d) { state.cClefs = d.v === '1'; save(); render(); },
   loseend(d) { state.loseEnding = d.v; save(); render(); },
+  walkmode(d) { state.walkMode = d.v; save(); render(); },
+  'walk-full'() { state.walkLo = 'C2'; state.walkHi = 'C6'; save(); render(); },
   reviewmissed(d) { state.reviewMissed = d.v; save(); render(); },
   cuntimed(d) { state.challengeUntimed = d.v === '1'; save(); render(); },
   // switching to Choose starts from the notes Automatic would ask now, so nothing changes until a note is tapped
@@ -2045,7 +2066,7 @@ const ACTIONS = {
   'creset-no'() { confirmChallengeReset = false; render(); },
   'creset-yes'() { state.challenge = { wins: 0, plays: 0 }; confirmChallengeReset = false; save(); render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed, challengeUntimed: state.challengeUntimed, reviewMissed: state.reviewMissed }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed, challengeUntimed: state.challengeUntimed, reviewMissed: state.reviewMissed, walkLo: state.walkLo, walkHi: state.walkHi, walkMode: state.walkMode }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },
@@ -2096,6 +2117,15 @@ app.addEventListener('pointerdown', e => { if (e.target.closest?.('svg[data-live
 app.addEventListener('pointermove', e => { if (dragging) placeAt(e); });
 window.addEventListener('pointerup', () => { dragging = false; });
 // the Challenge speed slider: saves as it moves, without redrawing the page
+// the Walking Up and Down range: the lowest note must stay below the highest
+app.addEventListener('change', e => {
+  if (e.target.id !== 'walk-lo' && e.target.id !== 'walk-hi') return;
+  const v = e.target.value;
+  if (e.target.id === 'walk-lo') { state.walkLo = v; if (stepOf(v) >= stepOf(state.walkHi || 'C6')) state.walkHi = pitchOf(Math.min(stepOf('C6'), stepOf(v) + 1)); }
+  else { state.walkHi = v; if (stepOf(v) <= stepOf(state.walkLo || 'C2')) state.walkLo = pitchOf(Math.max(stepOf('C2'), stepOf(v) - 1)); }
+  if (stepOf(state.walkLo) >= stepOf(state.walkHi)) { state.walkLo = 'C2'; state.walkHi = 'C6'; }
+  save(); render();
+});
 app.addEventListener('input', e => {
   if (e.target.id !== 'cspeed') return;
   state.challengeSpeed = +e.target.value; save();
