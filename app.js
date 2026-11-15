@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -1538,6 +1538,10 @@ function renderHome() {
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section class="challenge-card">
+    <div><h2>Walking Up and Down</h2><p class="note">Name 50 notes stepping up and down, from the C above the treble staff to the C below the bass staff, while Note Beast rows from Crete to Athens.${state.walks?.plays ? ` Best: ${state.walks.best} of 50 on the first try.` : ''}</p></div>
+    <button class="start" data-act="walk">Row</button>
+  </section>
+  <section class="challenge-card">
     <div><h2>Note Stories</h2><p class="note">Learn the sayings that help you remember the notes: Every Good Boy Does Fine, FACE, and more.</p></div>
     <button class="start" data-act="stories">Open</button>
   </section>
@@ -1907,9 +1911,10 @@ function render(shake) {
   // Songs have their own layout: the keys stay put at the bottom and the music scrolls above them.
   document.body.classList.toggle('song-mode', screen === 'song');
   document.body.classList.toggle('game-mode', screen === 'challenge');
-  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : screen === 'stories' ? renderStories() : screen === 'story' ? renderStory() : renderHome();
+  app.innerHTML = screen === 'play' ? renderPlay() : screen === 'done' ? renderDone() : screen === 'parent' ? renderParent() : screen === 'song' ? renderSong() : screen === 'map' ? renderMap() : screen === 'challenge' ? renderChallenge() : screen === 'who' ? renderWho() : screen === 'stories' ? renderStories() : screen === 'story' ? renderStory() : screen === 'walk' ? renderWalk() : renderHome();
   if (shake) { const el = document.querySelector('.choices, .key-wrap, .staff-wrap, .song-keys'); el && el.classList.add('shake'); }
   if (screen === 'song') followSong(wasAt);
+  if (screen === 'walk' && walk?.phase !== 'done') drawWalk();
   if (screen === 'play' || screen === 'done') showBeast();
   // answering out loud: listen while on the questions, stop everywhere else
   if (screen === 'play' && speakMode()) { if (!speech) startSpeech(); drawSpeakBar(); } else if (speech) stopSpeech();

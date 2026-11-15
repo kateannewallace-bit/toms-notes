@@ -195,8 +195,9 @@ function staffSvg(o) {
 // Two staffs joined by a brace and a line at the left: treble on top, bass below.
 function grandSvg(o) {
   const S = o.S || 14, w = o.width || 360, L = S * 1.7;
-  const top = staffSvg({ clef: 't', S, width: w - L, even: o.even, items: o.t || [], lo: Math.min(stepOf('C4'), ...(o.t || []).filter(i => i.p).map(i => stepOf(i.p))), parts: true });
-  const low = staffSvg({ clef: 'b', S, width: w - L, even: o.even, items: o.b || [], hi: Math.max(stepOf('C4'), ...(o.b || []).filter(i => i.p).map(i => stepOf(i.p))), parts: true });
+  // tHi / bLo fix the room above and below, so a moving line of notes doesn't make the staffs jump; extraT / extraB draw on each staff
+  const top = staffSvg({ clef: 't', S, width: w - L, even: o.even, items: o.t || [], lo: Math.min(stepOf('C4'), ...(o.t || []).filter(i => i.p).map(i => stepOf(i.p))), hi: o.tHi, extra: o.extraT, parts: true });
+  const low = staffSvg({ clef: 'b', S, width: w - L, even: o.even, items: o.b || [], hi: Math.max(stepOf('C4'), ...(o.b || []).filter(i => i.p).map(i => stepOf(i.p))), lo: o.bLo, extra: o.extraB, parts: true });
   const y0 = top.yTop, y1 = top.h + low.yTop + low.staffH, [bx0, by0, bx1, by1] = GLYPHS.brace.b, ky = (y1 - y0) / (by1 - by0), kx = Math.min(ky, S * 1.25 / (bx1 - bx0));
   const brace = `<path class="gl" transform="translate(${(L - (bx1 - bx0) * kx) / 2 - bx0 * kx} ${y1}) scale(${kx.toFixed(4)} ${(-ky).toFixed(4)})" d="${GLYPHS.brace.d}"/>`;
   // touch questions: the whole of each staff, or just each clef, can be tapped as the answer
@@ -378,6 +379,25 @@ function slash(when = 0) {
   os.connect(og); og.connect(masterGain); os.start(t2); os.stop(t2 + .45);
   liveNodes.push(src, os);
   soundingUntil = Math.max(soundingUntil, performance.now() + (when + 1.7) * 1000);
+}
+// An oar dipping into the water: a soft splash of noise and a low plunk, for each right answer in Walking Up and Down.
+function splash(when = 0) {
+  const a = audioReady();
+  if (!a) return;
+  const t0 = a.currentTime + when + .01, len = .55;
+  const n = a.createBuffer(1, Math.ceil(a.sampleRate * len), a.sampleRate), d = n.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = n; bp.type = 'bandpass'; bp.Q.value = .9;
+  bp.frequency.setValueAtTime(1800, t0); bp.frequency.exponentialRampToValueAtTime(500, t0 + len);
+  g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.45, t0 + .03); g.gain.exponentialRampToValueAtTime(.0001, t0 + len);
+  src.connect(bp); bp.connect(g); g.connect(masterGain); src.start(t0);
+  const os = a.createOscillator(), og = a.createGain();
+  os.type = 'sine'; os.frequency.setValueAtTime(260, t0); os.frequency.exponentialRampToValueAtTime(120, t0 + .18);
+  og.gain.setValueAtTime(.0001, t0); og.gain.exponentialRampToValueAtTime(.35, t0 + .01); og.gain.exponentialRampToValueAtTime(.0001, t0 + .22);
+  os.connect(og); og.connect(masterGain); os.start(t0); os.stop(t0 + .25);
+  liveNodes.push(src, os);
+  soundingUntil = Math.max(soundingUntil, performance.now() + (when + len + .2) * 1000);
 }
 // The Hydra's gulp: two quick, low, swallowing blips, then a little burp of a bellow.
 function gulp(when = 0) {

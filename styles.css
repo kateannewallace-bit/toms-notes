@@ -529,4 +529,44 @@ body.game-mode .board > * { flex: none; }
 .touch-zone { fill: transparent; cursor: pointer; }
 .touch-zone.ok { fill: rgba(23, 118, 58, .28); }
 .touch-zone.no { fill: rgba(179, 38, 30, .22); }
+/* Walking Up and Down */
+.scene-wrap { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid var(--chalk); background: #eaf5fb; }
+.voyage { display: block; width: 100%; height: auto; max-height: 34vh; }
+.voyage .world { transition: transform 1.1s cubic-bezier(.3, .6, .4, 1); }
+.voyage .place-name { font: 700 22px Georgia, serif; fill: #2a1a10; stroke: #fff; stroke-width: 4px; paint-order: stroke; }
+.voyage .boat { animation: bob 1.6s ease-in-out infinite alternate; transform-box: view-box; }
+.voyage .boat-wrap { transition: transform 1.6s cubic-bezier(.3, .6, .4, 1); }
+.voyage .oar-near, .voyage .oar-far, .voyage .rower .arm { transform-box: view-box; transform-origin: 326px 166px; }
+.voyage .oar-far { transform-origin: 300px 170px; }
+.voyage .rowing .oar-near, .voyage .rowing .oar-far, .voyage .rowing .arm { animation: row .9s ease-in-out 1; }
+@keyframes row { 0% { transform: rotate(0); } 40% { transform: rotate(-28deg); } 100% { transform: rotate(0); } }
+.voyage .waves { animation: waves 3s linear infinite; }
+@keyframes waves { from { transform: translateX(0); } to { transform: translateX(-40px); } }
+.voyage .dolphin { animation: leap 3.2s ease-in-out infinite; transform-box: fill-box; }
+@keyframes leap { 0%, 100% { translate: 0 18px; } 50% { translate: 0 -12px; } }
+.voyage .arrival { opacity: 0; transition: opacity .6s; }
+.arrived .voyage .arrival { opacity: 1; }
+.arrived .voyage .boat-wrap { transform: translateX(120px); }
+.voyage .cheer-arm { transform-box: fill-box; transform-origin: 0% 100%; animation: cheer-wave .4s ease-in-out infinite alternate; }
+.voyage .cheer-arm.r { transform-origin: 100% 100%; animation-delay: .2s; }
+@keyframes cheer-wave { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+.voyage .athenian { animation: hop .5s ease-in-out infinite alternate; transform-box: fill-box; }
+.voyage .a1 { animation: none; }
+.voyage .a2 { animation-delay: .15s; } .voyage .a3 { animation-delay: .3s; } .voyage .a4 { animation-delay: .1s; } .voyage .a5 { animation-delay: .25s; }
+@keyframes hop { from { translate: 0 0; } to { translate: 0 -6px; } }
+.voyage .kylix { animation: offer 1.4s ease-in-out infinite alternate; transform-box: fill-box; }
+@keyframes offer { from { translate: 0 0; } to { translate: -10px -4px; } }
+.voyage .petals circle { opacity: 0; }
+.arrived .voyage .petals circle { animation: petal 2.4s ease-in infinite; }
+@keyframes petal { 0% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: -30px 120px; } }
+.voyage .bubble-text { font: 700 20px Georgia, serif; fill: #2a1a10; }
+.walk-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 8px 2px 0; }
+.walk-count { font-weight: 700; }
+.walk-say { font-weight: 700; font-size: 1.1rem; }
+.walk-wrap svg { width: 100%; height: auto; }
+.walk-staff .n-head.walk-done { opacity: .55; }
+.w-letter { font-family: var(--font); font-weight: 900; }
+.w-letter.w-ok { fill: var(--green); } .w-letter.w-late { fill: #b07a00; } .w-letter.w-shown { fill: #b3261e; }
+.walk-done { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .voyage .boat, .voyage .waves, .voyage .dolphin, .voyage .cheer-arm, .voyage .athenian, .voyage .kylix, .arrived .voyage .petals circle { animation: none; } }
 
