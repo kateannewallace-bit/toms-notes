@@ -569,4 +569,7 @@ body.game-mode .board > * { flex: none; }
 .w-letter.w-ok { fill: var(--green); } .w-letter.w-late { fill: #b07a00; } .w-letter.w-shown { fill: #b3261e; }
 .walk-done { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .voyage .boat, .voyage .waves, .voyage .dolphin, .voyage .cheer-arm, .voyage .athenian, .voyage .kylix, .arrived .voyage .petals circle { animation: none; } }
+#walk-keys.walk-piano { display: block; }
+#walk-keys.walk-piano .key-wrap { max-width: none; width: 100%; }
+#walk-keys.walk-piano svg { width: 100%; height: auto; display: block; }
 

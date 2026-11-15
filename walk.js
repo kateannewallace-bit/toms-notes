@@ -4,7 +4,10 @@
    Above it, Note Beast rows a boat from Crete to Athens; the sea and the sights go by as the round goes on, Athens comes into
    view for the last five, and at the end the Athenians cheer and offer a celebratory cup (a kylix) of wine. */
 
-const WALK_LEN = 50, WALK_LO = stepOf('C2'), WALK_HI = stepOf('C6'), WALK_TRIES = 3, WALK_SHOW = 13;
+const WALK_LO = stepOf('C2'), WALK_HI = stepOf('C6'), WALK_TRIES = 3, WALK_SHOW = 13;
+// How many notes a round has: a grown-up setting from 10 to 100 (state.walkCount), 50 to start. Fixed when a round starts.
+const walkCount = () => Math.max(10, Math.min(100, Math.round((state.walkCount || 50) / 10) * 10));
+let WALK_LEN = 50;
 const WORLD_W = 4000, VIEW_W = 1000;
 // The range to walk, set on the grown-ups page (state.walkLo / state.walkHi); the whole range from C2 to C6 unless narrowed.
 const walkRange = () => {
@@ -48,6 +51,7 @@ function makeWalk() {
 
 function startWalk() {
   hush();
+  WALK_LEN = walkCount();
   walk = { ...makeWalk(), i: 0, tries: 0, results: [], wrong: [], msg: '', phase: 'play' };
   screen = 'walk';
   render();
@@ -168,10 +172,12 @@ function sceneSvg() {
       <g class="bubble"><rect x="690" y="16" width="240" height="44" rx="12" fill="#fff" stroke="#2a1a10" stroke-width="2.5"/><text x="810" y="45" text-anchor="middle" class="bubble-text">Welcome to Athens!</text></g></g>
   </svg>`;
 }
-// Slide the world along: the boat has come i of 50 legs of the way.
+// Slide the world along: the boat has come i of WALK_LEN legs of the way.
 function placeWorld() {
   const g = document.getElementById('world');
-  if (g) g.style.transform = `translateX(${-(walk.i / WALK_LEN) * (WORLD_W - VIEW_W)}px)`;
+  // the first part of the round covers 90% of the sea, so Athens comes into view for the last five notes whatever the round length
+  const i = walk.i, near = WALK_LEN - 5, p = i < near ? (i / near) * .9 : .9 + (i - near) / 5 * .1;
+  if (g) g.style.transform = `translateX(${-Math.min(1, p) * (WORLD_W - VIEW_W)}px)`;
 }
 function rowStroke() {
   const b = document.querySelector('.voyage .boat');
@@ -184,7 +190,7 @@ function renderWalk() {
   const w = walk;
   const head = `<header class="top"><h1>Note Beast On The High Seas</h1><button class="ghost" data-act="home">Home</button></header>`;
   if (w.phase === 'done') {
-    const first = w.results.filter(r => r === 'ok').length, best = state.walks?.best ?? first;
+    const first = w.results.filter(r => r === 'ok').length, best = state.walks?.bestBy?.[WALK_LEN] ?? first;
     return `${head}<div class="walk-done"><div class="scene-wrap">${sceneSvg()}</div>
       <h2>Note Beast made it to Athens!</h2><p class="note">${first} of ${WALK_LEN} notes right on the first try${state.walks?.plays > 1 ? ` · best so far: ${best}` : ''}.</p>
       <div class="next-row"><button class="start" data-act="walk">Row again</button><button class="ghost" data-act="home">Home</button></div></div>`;
@@ -201,11 +207,57 @@ function drawWalk() {
   if (!el('walk-staff')) return;
   el('walk-staff').innerHTML = walkStaffSvg();
   el('walk-count').textContent = w.phase === 'play' ? `Note ${w.i + 1} of ${WALK_LEN}` : `All ${WALK_LEN} notes!`;
-  el('walk-say').textContent = w.phase === 'play' ? (w.i >= WALK_LEN - 5 ? 'Athens is in sight! Name the blue note.' : 'Name the blue note.') : '';
-  el('walk-keys').innerHTML = w.phase === 'play' ? ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(L => `<button class="choice ${w.wrong.includes(L) ? 'no' : ''}" data-act="walk-letter" data-v="${L}" ${w.wrong.includes(L) ? 'disabled' : ''}>${L}</button>`).join('') : '';
+  el('walk-say').textContent = w.phase === 'play' ? (w.i >= WALK_LEN - 5 ? 'Athens is in sight! ' : '') + (state.walkAnswer === 'keys' ? 'Play the blue note.' : 'Name the blue note.') : '';
+  el('walk-keys').classList.toggle('walk-piano', state.walkAnswer === 'keys');
+  el('walk-keys').innerHTML = w.phase !== 'play' ? '' : state.walkAnswer === 'keys' ? walkPiano(el('walk-keys')) : ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(L => `<button class="choice ${w.wrong.includes(L) ? 'no' : ''}" data-act="walk-letter" data-v="${L}" ${w.wrong.includes(L) ? 'disabled' : ''}>${L}</button>`).join('');
   el('walk-msg').innerHTML = w.msg ? `<span class="${w.msgCls || 'how'}">${esc(w.msg)}</span>` : '';
   placeWorld();
   document.getElementById('scene')?.classList.toggle('in-sight', w.i >= WALK_LEN - 5);
+}
+/* ---------- answering on piano keys (a grown-up setting, state.walkAnswer = 'keys') ---------- */
+// The keyboard shows as many keys as fit at a comfortable size (about 46px each). If the whole range fits, it shows all of it
+// (padded out to fill the space); if not, a window of keys that holds the note: stepping, it centers on the note before (so
+// the window gives nothing away); jumping, the note lands somewhere inside it, never right at the edge.
+const WALK_KEY_PX = 46;
+function walkWindow(width) {
+  const w = walk, [LO, HI] = walkRange(), s = w.steps[w.i];
+  const fit = Math.max(8, Math.min(WALK_HI - WALK_LO + 1, Math.floor(width / WALK_KEY_PX)));
+  if (HI - LO + 1 <= fit) {
+    let from = LO - Math.floor((fit - (HI - LO + 1)) / 2);
+    from = Math.max(WALK_LO, Math.min(from, WALK_HI - fit + 1));
+    return { from, whites: fit };
+  }
+  let from;
+  if (state.walkMode === 'jump') {
+    const a = Math.max(LO, s - fit + 2), b = Math.min(HI - fit + 1, s - 1);
+    from = a <= b ? a + Math.floor(Math.random() * (b - a + 1)) : Math.max(LO, Math.min(s - Math.floor(fit / 2), HI - fit + 1));
+  } else {
+    const ref = w.i ? w.steps[w.i - 1] : s;
+    from = Math.max(LO, Math.min(ref - Math.floor(fit / 2), HI - fit + 1));
+  }
+  return { from, whites: fit };
+}
+function walkPiano(box) {
+  const w = walk;
+  // one window per note, so it doesn't shift between tries
+  if (w.winAt !== w.i || !w.win) { w.win = walkWindow(box.clientWidth || 720); w.winAt = w.i; }
+  const marks = {};
+  w.wrong.forEach(m => { if (typeof m === 'number') marks[m] = 'no'; });
+  return `<div class="key-wrap live">${pianoSvg({ from: w.win.from, whites: w.win.whites, letters: 'c', marks })}</div>`;
+}
+function walkKey(midi) {
+  const w = walk;
+  if (!w || w.phase !== 'play' || state.walkAnswer !== 'keys' || w.wrong.includes(midi)) return;
+  const s = w.steps[w.i], want = whiteMidi(s), right = letterOf(s);
+  if (midi === want) return walkNext(w.tries === 0 ? 'ok' : 'late', w.tries === 0 ? pick(PRAISE) : `Yes, ${right}.`);
+  w.tries++; w.wrong.push(midi);
+  if (!hearing()) { tone(midi, 0, .6, .5); grunt('sad', .4); }
+  if (w.tries >= WALK_TRIES) return walkNext('shown', `It is the ${right} ${midi > want ? 'lower down' : 'further up'}.`);
+  const sameLetter = !isBlack(midi) && keyName(midi) === right;
+  w.msg = `${sameLetter ? `That is ${withA(right)}, but too ${midi > want ? 'high: this one is further left' : 'low: this one is further right'}.` : `That’s ${isBlack(midi) ? 'a black key' : keyName(midi)}.`} ${w.tries === 1 ? 'Two more tries.' : 'One more try.'}`;
+  w.msgCls = 'how try-line';
+  drawWalk();
+  document.getElementById('walk-staff')?.classList.add('shake');
 }
 function walkLetter(L) {
   const w = walk;
@@ -242,9 +294,11 @@ function walkArrive() {
   setTimeout(() => scene?.classList.add('arrived'), 700);
   if (!hearing()) setTimeout(() => playSeq([{ midi: 60, beats: .3 }, { midi: 64, beats: .3 }, { midi: 67, beats: .3 }, { midi: 72, beats: .6 }, { midi: 67, beats: .3 }, { midi: 72, beats: 1.4 }], 116), 1500);
   grunt('happy', 2.6);
-  state.walks = state.walks || { plays: 0, best: 0 };
+  state.walks = state.walks || { plays: 0 };
   state.walks.plays++;
-  state.walks.best = Math.max(state.walks.best || 0, w.results.filter(r => r === 'ok').length);
+  // the best score is kept for each round length, so 10-note and 100-note rounds aren't compared
+  state.walks.bestBy = state.walks.bestBy || (state.walks.best != null ? { 50: state.walks.best } : {});
+  state.walks.bestBy[WALK_LEN] = Math.max(state.walks.bestBy[WALK_LEN] || 0, w.results.filter(r => r === 'ok').length);
   save();
   setTimeout(() => { if (screen === 'walk' && walk === w) { w.phase = 'done'; render(); document.querySelector('.walk-done .scene-wrap')?.classList.add('arrived', 'in-sight'); const g = document.getElementById('world'); if (g) { g.style.transition = 'none'; g.style.transform = `translateX(${-(WORLD_W - VIEW_W)}px)`; } } }, 6500);
 }

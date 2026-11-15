@@ -35,7 +35,7 @@ function defaultState() {
     childName: 'Tom', levels: Object.fromEntries(ORDER.map(k => [k, 1])),
     on: { basics: true, findc: true, clefnotes: true, path: true, reading: true }, basicsAdded: 1, findcAdded: 1, clefnotesAdded: 1,
     rec: {}, mastered: {}, words: {}, cards: [], cleared: 0, chapters: {}, songs: {},
-    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, walkLo: 'C2', walkHi: 'C6', walkMode: 'steps', updatedAt: 0,
+    sessions: [], log: [], done: {}, total: 0, perSession: 10, autoSpeak: false, realPiano: false, answerWith: 'letters',  speed: 'normal', challengeNotes: null, challengeClefs: ['t', 'b'], cClefs: false, loseEnding: 'sulk', challengeSpeed: 5, challengeUntimed: false, reviewMissed: 'all', stories: {}, walks: null, walkLo: 'C2', walkHi: 'C6', walkMode: 'steps', walkAnswer: 'letters', walkCount: 50, updatedAt: 0,
   };
 }
 function normalize(s) {
@@ -348,9 +348,12 @@ function renderWalkSettings() {
   const lo = state.walkLo || 'C2', hi = state.walkHi || 'C6', count = stepOf(hi) - stepOf(lo) + 1;
   return `<section>
     <h2>Note Beast On The High Seas</h2>
+    <div class="row-btns"><span>Notes per round</span><div class="seg seg-wrap">${[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(n => `<button data-act="walkcount" data-n="${n}" aria-pressed="${(state.walkCount || 50) === n}">${n}</button>`).join('')}</div></div>
+    <div class="row-btns"><span>Answer with</span><div class="seg">${[['letters', 'Letter buttons'], ['keys', 'Piano keys']].map(([v, t]) => `<button data-act="walkanswer" data-v="${v}" aria-pressed="${(state.walkAnswer || 'letters') === v}">${t}</button>`).join('')}</div></div>
+    <p class="note">${state.walkAnswer === 'keys' ? 'Piano keys: each note is played on its exact key. The keyboard shows as many keys as fit at a comfortable size: the whole range if it fits, otherwise the part around the note.' : 'Letter buttons: any C is answered with the C button.'}</p>
     <div class="row-btns"><span>Notes move</span><div class="seg">${[['steps', 'Up and down by steps'], ['jump', 'Jump around']].map(([v, t]) => `<button data-act="walkmode" data-v="${v}" aria-pressed="${(state.walkMode || 'steps') === v}">${t}</button>`).join('')}</div></div>
     <p class="note">${state.walkMode === 'jump' ? 'Jump around: each note can be anywhere in the range, never the same note twice in a row.' : 'Up and down by steps: each note is one step up or down from the one before.'}</p>
-    <p class="note">The highest and lowest notes the walk goes to. Narrow it to practice fewer notes; a round is still ${50} notes, ${state.walkMode === 'jump' ? 'all inside the range' : 'going back and forth inside the range'}.</p>
+    <p class="note">The highest and lowest notes the walk goes to. Narrow it to practice fewer notes; a round is still ${state.walkCount || 50} notes, ${state.walkMode === 'jump' ? 'all inside the range' : 'going back and forth inside the range'}.</p>
     <div class="row-btns"><label for="walk-hi">Highest note</label><select id="walk-hi" class="pick">${all.map(p => opt(p, hi)).join('')}</select></div>
     <div class="row-btns"><label for="walk-lo">Lowest note</label><select id="walk-lo" class="pick">${all.map(p => opt(p, lo)).join('')}</select></div>
     <p class="note" id="walk-range-note">${count} notes, from ${lo} up to ${hi}.</p>
@@ -1556,7 +1559,7 @@ function renderHome() {
   </section>
   <div class="row-btns"><button class="start" data-act="start">Start <small>${state.perSession} questions</small></button><button class="ghost" data-act="map">Note map</button></div>
   <section class="challenge-card">
-    <div><h2>Note Beast On The High Seas</h2><p class="note">Name 50 notes ${state.walkMode === 'jump' ? 'jumping around' : 'stepping up and down'}, ${(state.walkLo || 'C2') === 'C2' && (state.walkHi || 'C6') === 'C6' ? 'from the C above the treble staff to the C below the bass staff' : `between ${state.walkLo} and ${state.walkHi}`}, while Note Beast rows from Crete to Athens.${state.walks?.plays ? ` Best: ${state.walks.best} of 50 on the first try.` : ''}</p></div>
+    <div><h2>Note Beast On The High Seas</h2><p class="note">Name ${state.walkCount || 50} notes ${state.walkMode === 'jump' ? 'jumping around' : 'stepping up and down'}, ${(state.walkLo || 'C2') === 'C2' && (state.walkHi || 'C6') === 'C6' ? 'from the C above the treble staff to the C below the bass staff' : `between ${state.walkLo} and ${state.walkHi}`}, while Note Beast rows from Crete to Athens.${state.walks?.plays && (state.walks.bestBy?.[state.walkCount || 50] ?? (+(state.walkCount || 50) === 50 ? state.walks.best : null)) != null ? ` Best: ${state.walks.bestBy?.[state.walkCount || 50] ?? state.walks.best} of ${state.walkCount || 50} on the first try.` : ''}</p></div>
     <button class="start" data-act="walk">Row</button>
   </section>
   <section class="challenge-card">
@@ -2040,6 +2043,8 @@ const ACTIONS = {
   cclef(d) { const on = challengeClefs(), next = on.includes(d.v) ? on.filter(c => c !== d.v) : [...on, d.v]; if (next.length) { state.challengeClefs = next; save(); } render(); },
   cclefs(d) { state.cClefs = d.v === '1'; save(); render(); },
   loseend(d) { state.loseEnding = d.v; save(); render(); },
+  walkcount(d) { state.walkCount = +d.n; save(); render(); },
+  walkanswer(d) { state.walkAnswer = d.v; save(); render(); },
   walkmode(d) { state.walkMode = d.v; save(); render(); },
   'walk-full'() { state.walkLo = 'C2'; state.walkHi = 'C6'; save(); render(); },
   reviewmissed(d) { state.reviewMissed = d.v; save(); render(); },
@@ -2066,7 +2071,7 @@ const ACTIONS = {
   'creset-no'() { confirmChallengeReset = false; render(); },
   'creset-yes'() { state.challenge = { wins: 0, plays: 0 }; confirmChallengeReset = false; save(); render(); },
   'wipe-no'() { confirmWipe = false; render(); },
-  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed, challengeUntimed: state.challengeUntimed, reviewMissed: state.reviewMissed, walkLo: state.walkLo, walkHi: state.walkHi, walkMode: state.walkMode }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
+  'wipe-yes'() { const keep = { childName: state.childName, perSession: state.perSession, answerWith: state.answerWith, autoSpeak: state.autoSpeak, realPiano: state.realPiano, speed: state.speed, challengeNotes: state.challengeNotes, challengeClefs: state.challengeClefs, cClefs: state.cClefs, loseEnding: state.loseEnding, challengeSpeed: state.challengeSpeed, challengeUntimed: state.challengeUntimed, reviewMissed: state.reviewMissed, walkLo: state.walkLo, walkHi: state.walkHi, walkMode: state.walkMode, walkAnswer: state.walkAnswer, walkCount: state.walkCount }; state = Object.assign(defaultState(), keep); confirmWipe = false; save(); render(); },
   async 'sync-new'() { await startSync(newCode()); pushRemote(); render(); },
   async 'sync-join'() { const c = cleanCode(document.getElementById('join-code')?.value || ''); if (!c) { sync.error = 'bad-code'; render(); return; } sync.error = ''; await startSync(c); render(); },
   async 'sync-now'() { sync.status = 'syncing'; render(); await pullRemote(); render(); },
@@ -2078,6 +2083,7 @@ app.addEventListener('click', e => {
     audioReady();
     if (screen === 'song') { if (!state.realPiano) songTap(+key.dataset.midi); return; }
     if (screen === 'challenge') { challengeKey(+key.dataset.midi); return; }
+    if (screen === 'walk') { walkKey(+key.dataset.midi); return; }
     if (screen === 'play' && key.closest('.key-wrap.live')) tapKey(+key.dataset.midi);
     return;
   }
