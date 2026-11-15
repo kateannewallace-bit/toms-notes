@@ -4,7 +4,7 @@
    Above it, Note Beast rows a boat from Crete to Athens; the sea and the sights go by as the round goes on, Athens comes into
    view for the last five, and at the end the Athenians cheer and offer a celebratory cup (a kylix) of wine. */
 
-const WALK_LO = stepOf('C2'), WALK_HI = stepOf('C6'), WALK_TRIES = 3, WALK_SHOW = 13;
+const WALK_LO = stepOf('C2'), WALK_HI = stepOf('C6'), WALK_TRIES = 3, WALK_SHOW = 11;
 // How many notes a round has: a grown-up setting from 10 to 100 (state.walkCount), 50 to start. Fixed when a round starts.
 const walkCount = () => Math.max(10, Math.min(100, Math.round((state.walkCount || 50) / 10) * 10));
 let WALK_LEN = 50;
@@ -62,12 +62,21 @@ function startWalk() {
 }
 
 /* ---------- the staff: a window of the line, the current note in blue, answered letters underneath ---------- */
+// The notes come in pages of 11 that stay still while they're answered (Katie: don't slide the row along every answer);
+// after the 11th, the next page appears. A bouncing blue arrow points down at the note to name.
 function walkStaffSvg() {
-  const w = walk, start = Math.max(0, Math.min(w.i - 5, WALK_LEN - WALK_SHOW)), idx = Array.from({ length: WALK_SHOW }, (_, k) => start + k);
-  const item = (c, n) => w.clefs[n] === c ? { p: pitchOf(w.steps[n]), d: 'w', cls: n === w.i && w.phase === 'play' ? 'now' : n < w.i ? 'walk-done' : '' } : { skip: 1, d: 'w' };
+  const w = walk, start = Math.floor(Math.min(w.i, WALK_LEN - 1) / WALK_SHOW) * WALK_SHOW, idx = Array.from({ length: WALK_SHOW }, (_, k) => start + k);
+  const has = n => n < WALK_LEN, current = n => n === w.i && w.phase === 'play';
+  const item = (c, n) => has(n) && w.clefs[n] === c ? { p: pitchOf(w.steps[n]), d: 'w', cls: current(n) ? 'now' : n < w.i ? 'walk-done' : '' } : { skip: 1, d: 'w' };
   const col = r => r === 'ok' ? 'w-ok' : r === 'late' ? 'w-late' : 'w-shown';
+  const arrow = c => ({ x, Y, S }) => idx.map((n, k) => !has(n) || !current(n) || w.clefs[n] !== c ? '' : (() => {
+    const tip = Y(w.steps[n]) - S * 1.25, cx = x[k];
+    const hw = S * 1.7, hh = S * 1.8, sw = S * .62, top = tip - S * 4.4;
+    return `<g class="walk-arrow"><path d="M${cx} ${tip} L${cx - hw} ${tip - hh} Q${cx - hw - S * .2} ${tip - hh - S * .45} ${cx - hw + S * .45} ${tip - hh - S * .4} L${cx - sw} ${tip - hh - S * .4} L${cx - sw} ${top + sw} Q${cx - sw} ${top} ${cx} ${top} Q${cx + sw} ${top} ${cx + sw} ${top + sw} L${cx + sw} ${tip - hh - S * .4} L${cx + hw - S * .45} ${tip - hh - S * .4} Q${cx + hw + S * .2} ${tip - hh - S * .45} ${cx + hw} ${tip - hh} Z"/><path class="shine" d="M${cx - sw * .35} ${top + sw * .9} L${cx - sw * .35} ${tip - hh - S * .9}"/></g>`;
+  })()).join('');
+  const letters = ({ x, Y, S }) => idx.map((n, k) => has(n) && (n < w.i || (w.phase !== 'play' && n <= w.i)) ? `<text class="w-letter ${col(w.results[n])}" x="${x[k]}" y="${Y(WALK_LO) + S * 2.2}" text-anchor="middle" font-size="${S * 1.5}">${letterOf(w.steps[n])}</text>` : '').join('');
   return grandSvg({ S: 13, width: 760, even: true, tHi: WALK_HI, bLo: WALK_LO, t: idx.map(n => item('t', n)), b: idx.map(n => item('b', n)), cl: 'walk-staff',
-    extraB: ({ x, Y, S }) => idx.map((n, k) => n < w.i || (w.phase !== 'play' && n <= w.i) ? `<text class="w-letter ${col(w.results[n])}" x="${x[k]}" y="${Y(WALK_LO) + S * 2.2}" text-anchor="middle" font-size="${S * 1.5}">${letterOf(w.steps[n])}</text>` : '').join('') });
+    extraT: arrow('t'), extraB: o => arrow('b')(o) + letters(o) });
 }
 
 /* ---------- the voyage ---------- */

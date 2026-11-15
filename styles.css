@@ -575,4 +575,12 @@ body.game-mode .board > * { flex: none; }
 #walk-keys .keys-moved { animation: keys-moved .7s ease-out 1; }
 @keyframes keys-moved { 0% { transform: translateX(14px); opacity: .3; } 60% { opacity: 1; } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { #walk-keys .keys-moved { animation: none; } }
+/* High Seas: a cheerful blue arrow bouncing over the note to name */
+.walk-staff { overflow: visible; }
+.walk-wrap { padding-top: 44px; }
+.walk-arrow .shine { fill: none; stroke: rgba(255,255,255,.7); stroke-width: 3px; stroke-linecap: round; filter: none; }
+.walk-arrow path { fill: var(--blue); stroke: #fff; stroke-width: 2.5px; stroke-linejoin: round; paint-order: stroke; filter: drop-shadow(0 1px 0 rgba(17,17,17,.35)); }
+.walk-arrow { animation: arrow-bounce .6s ease-in-out infinite alternate; }
+@keyframes arrow-bounce { from { transform: translateY(-5px); } to { transform: translateY(1px); } }
+@media (prefers-reduced-motion: reduce) { .walk-arrow { animation: none; } }
 
